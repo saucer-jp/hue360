@@ -1,3 +1,9 @@
+/*!
+ * style.scss
+ * author: Tsukasa Obara
+ * url   : http://saucer.jp
+ */
+
 @import "global_mixins";
 // ********************
 // vendor prefix output flag
@@ -206,6 +212,7 @@ body {
   .circle {
     .chip {
       position:absolute;
+      z-index:300;
     }
     .color-clash {
       opacity:0;
@@ -220,8 +227,8 @@ body {
 }
 
 #brightness {
-  z-index:100;
   position:absolute;
+  z-index:300;
   top:300px;
   left:4px;
   margin:0;
@@ -235,6 +242,7 @@ body {
     @extend %web-font;
     font-size:10px;
   }
+  .chip1,
   .current-brightness {
     @include box-shadow( 0 0 6px #08f );
   }
@@ -281,7 +289,7 @@ body {
 #print {
   font-family:helvetica,arial;
   position:fixed;
-  z-index:400;
+  z-index:500;
   left:36px;
   bottom:50px;
   background:rgba( #eee, 0.8 );
