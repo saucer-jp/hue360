@@ -4,7 +4,9 @@
  * author: Tsukasa Obara
  * url   : http://saucer.jp
  */
-#controller h1, #controller h2, #title, .version, #copyright, #userColor .base-color .print-user-color, #userColor .base-color .remove-btn em, #colorCircle:before, #brightness:before {
+#controller h1, #controller h2, #title, .version, #copyright, #userColor .base-color .print-user-color, #userColor .base-color .remove-btn em, #colorCircle:before, #brightness:before, .ie6:before,
+.ie7:before,
+.ie8:before {
   font-family: 'Oswald', sans-serif;
   font-weight: 300;
   letter-spacing: 1px; }
@@ -252,3 +254,19 @@ body {
     width: 4em; }
   #print .remove-btn {
     background: #ccc; }
+
+.ie6 #colorCircle,
+.ie6 #controller,
+.ie7 #colorCircle,
+.ie7 #controller,
+.ie8 #colorCircle,
+.ie8 #controller {
+  display: none; }
+.ie6:before,
+.ie7:before,
+.ie8:before {
+  content: 'non-compliant IE6,7,8';
+  font-size: 26px;
+  position: absolute;
+  top: 142px;
+  left: 35px; }

@@ -329,3 +329,22 @@ body {
     background:#ccc;
   }
 }
+// ********************
+// is IE
+// ********************
+.ie6,
+.ie7,
+.ie8 {
+  #colorCircle,
+  #controller {
+    display:none;
+  }
+  &:before {
+    content:'non-compliant IE6,7,8';
+    @extend %web-font;
+    font-size:26px;
+    position:absolute;
+    top:142px;
+    left:35px;
+  }
+}

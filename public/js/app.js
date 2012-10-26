@@ -7,6 +7,9 @@ $(function(){
   // ********************
   // init
   // ********************
+  var ua = getUserInfo();
+  $('body').addClass( ua.info );
+
   var statuses = {
     colorSpace: 'munsell',
     hueStep: 20,
@@ -235,6 +238,128 @@ $(function(){
     App.circle = new ColorCircle( statuses ).judge().render();
   }
 
+  function getUserInfo(){
+
+    var user = {
+      agent: '',
+      info: []
+    };
+    user.agent = window.navigator.userAgent.toLowerCase();
+
+    var device = {
+      0: 'ipod',
+      1: 'ipad',
+      2: 'iphone',
+      3: 'android',
+      4: 'win-phone',
+      5: 'blackberry',
+      6: 'pc'
+    };
+    var os = {
+      0: {
+        0: 'win',
+        1: 'xp',
+        2: 'vista',
+        3: 'win7',
+        4: 'win8' },
+      1: {
+        0: 'mac',
+        1: 'ios' },
+      2: 'linux'
+    };
+    var engine = {
+      0: 'trident',
+      1: 'webkit',
+      2: 'gecko'
+    };
+    var browser = {
+      0: {
+        0: 'ie',
+        1: 'ie6',
+        2: 'ie7',
+        3: 'ie8',
+        4: 'ie9',
+        5: 'ie10' },
+      1: 'chrome',
+      2: 'safari',
+      3: 'firefox',
+      4: 'opera'
+    };
+
+    // device
+    if( /ipod/.test( user.agent ) ){
+      user.info.push( device[0] );
+    } else if ( /ipad/.test( user.agent ) ){
+      user.info.push( device[1] );
+    } else if ( /iphone/.test( user.agent ) ){
+      user.info.push( device[2] );
+    } else if ( /android/.test( user.agent ) ){
+      user.info.push( device[3] );
+    } else if ( /windows phone/.test( user.agent ) ){
+      user.info.push( device[4] );
+    } else if ( /blackberry/.test( user.agent ) ){
+      user.info.push( device[5] );
+    } else {
+      user.info.push( device[6] );
+    }
+
+    // os
+    if( /windows/.test( user.agent ) ){
+      user.info.push( os[0][0] );
+      if( /windows nt 5\.1/.test( user.agent ) ){
+        user.info.push( os[0][1] );
+      } else if ( /windows nt 6\.0/.test( user.agent ) ){
+        user.info.push( os[0][2] );
+      } else if ( /windows nt 6\.1/.test( user.agent ) ){
+        user.info.push( os[0][3] );
+      } else if ( /windows nt 6\.2/.test( user.agent ) ){
+        user.info.push( os[0][4] );
+      }
+    } else if ( /mac/.test( user.agent ) ){
+      user.info.push( os[1][0] );
+      if( /iphone|ipad|ipod/.test( user.agent ) ){
+        user.info.push( os[1][1] );
+      }
+    } else if ( /linux/.test( user.agent ) ){
+      user.info.push( os[2] );
+    }
+
+    // engine
+    if( /msie/.test( user.agent ) ){
+      user.info.push( engine[0] );
+    } else if ( /webkit/.test( user.agent ) ){
+      user.info.push( engine[1] );
+    } else if ( /gecko/.test( user.agent ) ){
+      user.info.push( engine[2] );
+    }
+
+    // browser
+    if( /msie/.test( user.agent ) ){
+      user.info.push( browser[0][0] );
+      if( /msie 6/.test( user.agent ) ){
+        user.info.push( browser[0][1] );
+      } else if ( /msie 7/.test( user.agent ) ){
+        user.info.push( browser[0][2] );
+      } else if ( /msie 8/.test( user.agent ) ){
+        user.info.push( browser[0][3] );
+      } else if ( /msie 9/.test( user.agent ) ){
+        user.info.push( browser[0][4] );
+      } else if ( /msie 10/.test( user.agent ) ){
+        user.info.push( browser[0][5] );
+      }
+    } else if ( /chrome/.test( user.agent ) ){
+      user.info.push( browser[1] );
+    } else if ( /safari/.test( user.agent ) ){
+      user.info.push( browser[2] );
+    } else if ( /firefox/.test( user.agent ) ){
+      user.info.push( browser[3] );
+    } else if ( /opera/.test( user.agent ) ){
+      user.info.push( browser[4] );
+    }
+
+    user.info = user.info.join(' ');
+    return user;
+  };
 
 
 });
