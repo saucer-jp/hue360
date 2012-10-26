@@ -33,7 +33,7 @@ $(function(){
   // --------------------
   // #brightness .chip のクリック
   // --------------------
-  $('#brightness').find('.chip').on('click', function(e){
+  $('#brightness').find('.chip').on('click touchstart', function(e){
     if( e.shiftKey ) return;
 
     var current = 'current-brightness';
@@ -126,7 +126,7 @@ $(function(){
   // --------------------
   // .chip のクリック
   // --------------------
-  $(document).on( 'click', '.chip', function(e){
+  $(document).on( 'click touchstart', '.chip', function(e){
     var chipColor = $(this).css('background-color');
     var chipColorId = $(this).data('chip-id');
 
@@ -184,7 +184,7 @@ $(function(){
   // --------------------
   // #userColor .print-user-color のクリック
   // --------------------
-  $(document).on( 'click', '#userColor .print-user-color', function(){
+  $(document).on( 'click touchstart', '#userColor .print-user-color', function(){
     var $print = $('#print');
     if( $print.find('ul').length ){
       $print.empty();
