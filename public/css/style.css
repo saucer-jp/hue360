@@ -9,6 +9,34 @@
   font-weight: 300;
   letter-spacing: 1px; }
 
+#userColor .remove-btn, #print .remove-btn {
+  cursor: pointer;
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  top: 5px;
+  right: 6px;
+  -moz-border-radius: 4px;
+  border-radius: 4px; }
+  #userColor .remove-btn:hover, #print .remove-btn:hover {
+    background: #08f; }
+  #userColor .remove-btn:before, #print .remove-btn:before, #userColor .remove-btn:after, #print .remove-btn:after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 2px;
+    width: 14px;
+    height: 1px;
+    background: #fff; }
+  #userColor .remove-btn:before, #print .remove-btn:before {
+    -webkit-transform: rotate(45deg);
+    -moz-transform: rotate(45deg);
+    transform: rotate(45deg); }
+  #userColor .remove-btn:after, #print .remove-btn:after {
+    -webkit-transform: rotate(135deg);
+    -moz-transform: rotate(135deg);
+    transform: rotate(135deg); }
+
 html,
 body {
   height: 100%;
@@ -107,33 +135,6 @@ body {
         left: 43px; }
   #userColor .sub-color {
     width: 80px; }
-  #userColor .remove-btn {
-    cursor: pointer;
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    top: 5px;
-    right: 6px;
-    -moz-border-radius: 4px;
-    border-radius: 4px; }
-    #userColor .remove-btn:hover {
-      background: #08f; }
-    #userColor .remove-btn:before, #userColor .remove-btn:after {
-      content: '';
-      position: absolute;
-      top: 8px;
-      left: 2px;
-      width: 14px;
-      height: 1px;
-      background: #fff; }
-    #userColor .remove-btn:before {
-      -webkit-transform: rotate(45deg);
-      -moz-transform: rotate(45deg);
-      transform: rotate(45deg); }
-    #userColor .remove-btn:after {
-      -webkit-transform: rotate(135deg);
-      -moz-transform: rotate(135deg);
-      transform: rotate(135deg); }
 
 #colorCircle {
   position: absolute;
@@ -243,3 +244,5 @@ body {
   #print .val {
     display: inline-block;
     width: 4em; }
+  #print .remove-btn {
+    background: #ccc; }

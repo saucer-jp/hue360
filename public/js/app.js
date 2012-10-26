@@ -158,6 +158,7 @@ $(function(){
       App.userColor = new UserColor().render( chipColor );
     } else {
       App.userColor.render( chipColor );
+      if( $('#print').find('ul').length ) App.userColor.print(); // MEMO どうなの？
     }
   });
 
@@ -172,12 +173,21 @@ $(function(){
       statuses.baseColor = null;
       createColorCircle( statuses );
       App.userColor.remove();
+      $('#print').empty();
     }
     if( $this.is('.sub-color') ){
       // MEMO ここどうなの？
-      var subColorLength = $this.siblings().not('.base-color').length;
       App.userColor.remove( $this );
+      if( $('#print').find('ul').length ) App.userColor.print(); // MEMO どうなの？
     }
+  });
+
+
+  // --------------------
+  // #print .remove-btn のクリック
+  // --------------------
+  $(document).on( 'click', '#print .remove-btn', function(){
+    $('#print').empty();
   });
 
 
@@ -185,12 +195,7 @@ $(function(){
   // #userColor .print-user-color のクリック
   // --------------------
   $(document).on( 'click touchstart', '#userColor .print-user-color', function(){
-    var $print = $('#print');
-    if( $print.find('ul').length ){
-      $print.empty();
-    } else {
-      App.userColor.print();
-    }
+    App.userColor.print();
   });
 
 

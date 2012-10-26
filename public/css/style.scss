@@ -21,6 +21,34 @@ $prefix-ms:false;
   font-weight:300;
   letter-spacing:1px;
 }
+%remove-btn {
+  cursor:pointer;
+  position:absolute;
+  width:18px;
+  height:18px;
+  top:5px;
+  right:6px;
+  @include border-radius( 4px );
+  &:hover {
+    background:#08f;
+  }
+  &:before,
+  &:after {
+    content:'';
+    position:absolute;
+    top:8px;
+    left:2px;
+    width:14px;
+    height:1px;
+    background:#fff;
+  }
+  &:before {
+    @include transform( rotate(45deg) );
+  }
+  &:after {
+    @include transform( rotate(135deg) );
+  }
+}
 // ********************
 // style
 // ********************
@@ -149,32 +177,7 @@ body {
     width:80px;
   }
   .remove-btn {
-    cursor:pointer;
-    position:absolute;
-    width:18px;
-    height:18px;
-    top:5px;
-    right:6px;
-    @include border-radius( 4px );
-    &:hover {
-      background:#08f;
-    }
-    &:before,
-    &:after {
-      content:'';
-      position:absolute;
-      top:8px;
-      left:2px;
-      width:14px;
-      height:1px;
-      background:#fff;
-    }
-    &:before {
-      @include transform( rotate(45deg) );
-    }
-    &:after {
-      @include transform( rotate(135deg) );
-    }
+    @extend %remove-btn;
   }
 }
 
@@ -313,5 +316,9 @@ body {
   .val {
     display:inline-block;
     width:4em;
+  }
+  .remove-btn {
+    @extend %remove-btn;
+    background:#ccc;
   }
 }

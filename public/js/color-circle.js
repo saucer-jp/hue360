@@ -705,7 +705,8 @@ function UserColor(){
     subColorClass: 'sub-color',
     colorCodeClass: 'color-code',
     removeBtnClass: 'remove-btn',
-    printTarget: '#print'
+    printTarget: '#print',
+    subColorCount: 0
   };
 
 
@@ -762,13 +763,17 @@ function UserColor(){
       .css('background-color', webColor)
       .addClass( s.selectedClass )
       .addClass( s.subColorClass )
+      .attr( 'data-sub-color-id', s.subColorCount )
       .append( $removeBtn.clone() );
 
     if( u.baseColor == null ){
       $userColor.append( $baseColor.clone() );
     } else {
       $userColor.append( $subColor.clone() );
+      s.subColorCount++;
     }
+
+    statuses = s;
 
     // set data
     _set( webColor );
@@ -788,6 +793,9 @@ function UserColor(){
       .append('<span class="chip"/>')
       .append('<span class="key"/>')
       .append('<span class="val"/>')
+
+    var $removeBtn = $('<span/>')
+      .addClass( s.removeBtnClass );
 
     // set bgColor colde
     var val = (function(){
@@ -819,6 +827,7 @@ function UserColor(){
 
       if( $.isArray( val ) ){
         $.each( val, function( key, val ){
+          if( val == null ) return;
           $list = _$list.clone();
           $list.find('.chip').css( 'background-color', val );
           $list.find('.key').text( 'subColor: ' );
@@ -835,7 +844,10 @@ function UserColor(){
       }
     });
 
-    $( printTarget ).append( $colorCode );
+    $( printTarget )
+      .empty()
+      .append( $colorCode )
+      .append( $removeBtn.clone() );
     return this;
   };
 
@@ -850,7 +862,18 @@ function UserColor(){
       $( s.selector ).empty();
     } else if ( $this.is( '.' + s.subColorClass ) ){
       // TODO userData内のselectedColorを消せ！
+      
+
+      var subColorId = $this.data( 'sub-color-id' );
+      u.selectedColor[ subColorId ] = null;
       $this.remove();
+
+
+
+
+
+
+
       //if( $this.is( s.baseColorClass ) ){
       //  _removeBaseColor( $this );
       //} else {
