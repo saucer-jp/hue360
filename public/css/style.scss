@@ -105,12 +105,19 @@ body {
   top:34px;
   //@include transform( rotate(90deg) );
 }
+.version {
+  @extend %web-font;
+  font-size:10px;
+  position:absolute;
+  top:84px;
+  left:35px;
+}
 #copyright {
   @extend %web-font;
   font-size:10px;
   position:absolute;
-  left:35px;
-  top:85px;
+  left:103px;
+  top:84px;
   //@include transform( rotate(90deg) );
   .saucer-web {
     color:#000;
