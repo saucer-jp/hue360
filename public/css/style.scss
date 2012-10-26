@@ -242,10 +242,6 @@ body {
     @extend %web-font;
     font-size:10px;
   }
-  .chip1,
-  .current-brightness {
-    @include box-shadow( 0 0 6px #08f );
-  }
   .chip{
     display:inline-block;
     margin-right:4px;
@@ -256,6 +252,7 @@ body {
   }
   .chip1 {
     background-color:#FFFFFF;
+    @include box-shadow( 0 0 6px rgba( #000, 0.3 ) );
   }
   .chip2 {
     background-color:#E3E3E3;
@@ -283,6 +280,9 @@ body {
   }
   .chip10 {
     background-color:#000000;
+  }
+  .current-brightness {
+    @include box-shadow( 0 0 6px #08f );
   }
 }
 
