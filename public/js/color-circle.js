@@ -117,12 +117,12 @@ function ColorCircle( initStatuses ){
     var d = data;
     var s = statuses;
     var chromaStep = s.chromaStep;
-    var judge = s.judge;
+    var judgeFlg = s.judgeFlg;
     var chipStatuses = d.chipStatuses;
     var colorStatuses = d.colorStatuses;
     var baseColor = d.baseColor;
     if( baseColor == null ) return this;
-    if( judge == false ){
+    if( judgeFlg == false ){
       d.colorCircle.find('.chip').removeClass( s.clashClass );
       return this;
     }
@@ -1157,7 +1157,7 @@ function judgeColor( data, statuses, id, webColor ){
     b = {
       h: baseColor.hue,
       s: baseColor.chroma,
-      b: baseColor.brightness
+      b: s.baseColorBrightness * 10 / brightnessStep
     };
     t = {
       h: targetColor.hue,

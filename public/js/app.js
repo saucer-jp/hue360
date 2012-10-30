@@ -15,9 +15,10 @@ $(function(){
     hueStep: 20,
     chromaStep: 7,
     brightness: 0,
-    judge: null,
+    judgeFlg: null,
     baseColor: null,
-    baseColorId: null
+    baseColorId: null,
+    baseColorBrightness: null
   };
 
   App = {};
@@ -157,6 +158,7 @@ $(function(){
     if( statuses.baseColor == null ){
       statuses.baseColor = chipColor;
       statuses.baseColorId = chipColorId;
+      statuses.baseColorBrightness = statuses.brightness;
       createColorCircle( statuses );
       App.userColor = new UserColor().render( chipColor );
     } else {
@@ -225,7 +227,7 @@ $(function(){
     var val = $('#judge').find('option:selected').val();
     if( val == 'true' ) val = true;
     if( val == 'false' ) val = false;
-    statuses.judge = val;
+    statuses.judgeFlg = val;
   }
 
   function BGColorInit(){
