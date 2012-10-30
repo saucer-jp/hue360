@@ -861,24 +861,9 @@ function UserColor(){
       u.selectedColor = [];
       $( s.selector ).empty();
     } else if ( $this.is( '.' + s.subColorClass ) ){
-      // TODO userData内のselectedColorを消せ！
-      
-
       var subColorId = $this.data( 'sub-color-id' );
       u.selectedColor[ subColorId ] = null;
       $this.remove();
-
-
-
-
-
-
-
-      //if( $this.is( s.baseColorClass ) ){
-      //  _removeBaseColor( $this );
-      //} else {
-      //  _removeSubColor( $this );
-      //}
     }
     userData = u;
     return this;
