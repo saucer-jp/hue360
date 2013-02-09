@@ -869,6 +869,22 @@ function UserColor(){
     return this;
   };
 
+  // lastColorRemove
+  this.lastColorRemove = function(){
+    var u = userData;
+    var s = statuses;
+    var colorAry = u.selectedColor;
+
+    if( colorAry.length == 0 ){
+      // MEMO 実装が汚いせいで難しくなったので後回し 2013/02/10
+    } else {
+      u.selectedColor = colorAry.slice(0,-1);
+      $( s.selector ).find( '.' + s.selectedClass ).last().remove();
+    }
+
+    userData = u;
+    return this;
+  };
 
   // save
   this.save = function(){

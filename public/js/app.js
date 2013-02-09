@@ -204,6 +204,25 @@ $(function(){
   });
 
 
+  // --------------------
+  // ショートカット
+  // --------------------
+
+  $(document).keydown(function( event ){
+    switch ( event.keyCode.toString() ) {
+
+      // del key
+      case "8":
+        if( App.userColor == undefined ) return false;
+        App.userColor.lastColorRemove();
+        if( $('#print').find('ul').length ) App.userColor.print(); // MEMO どうなの？
+        return false;
+        break;
+
+      // default
+      default:
+    }
+  });
 
   // ********************
   // functions
