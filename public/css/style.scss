@@ -158,6 +158,28 @@ body {
         color:#08f;
       }
     }
+    .try-painting {
+      @extend %web-font;
+      position:absolute;
+      left:100px;
+      top:6px;
+      cursor:pointer;
+      @include user-select( none );
+      a {
+        color:#fff;
+        font-size:10px;
+        text-decoration: none;
+        &:hover {
+          color:#08f;
+        }
+      }
+      &:before {
+        content: '/';
+        color:#fff;
+        position: absolute;
+        left: -12px;
+      }
+    }
     .remove-btn {
       width:60px;
       em {

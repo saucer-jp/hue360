@@ -687,6 +687,8 @@ function Chip(){
 // ユーザーカラー
 // --------------------
 function UserColor(){
+  var self = this;
+
   // user data
   var userData = {
     baseColor: null,
@@ -738,6 +740,29 @@ function UserColor(){
     return userData;
   };
 
+  // 外部アプリ連携用のhashを返す機能
+  this._createHash = function(){
+    var result = '#ec=';
+    var userData = self.get();
+    var comma = ',';
+
+    var baseColor = userData.baseColor.substring( 1 ) + comma;
+
+    var selectedColor = '';
+    var ary = userData.selectedColor;
+    var length = ary.length;
+    if( length !== 0 ){
+      $.each( ary, function( i ){
+        selectedColor = selectedColor + ary[ i ].substring( 1 ) + comma;
+      });
+    }
+
+    result = result + baseColor + selectedColor;
+    result = result.slice( 0, -1 );
+
+    console.log( result );
+    return result; // return string
+  };
 
   // render
   this.render = function( webColor ){
@@ -747,6 +772,27 @@ function UserColor(){
 
     var $removeBtn = $('<span/>')
       .addClass( s.removeBtnClass );
+
+    // create try painting button
+    var $tryPaintingBtn = function(){
+      var result = [];
+      var className = 'try-painting';
+      var text = 'Try Painting';
+
+      var hash = self._createHash( webColor );
+      var url = 'http://prog4designer.github.com/paint-hands-on/';
+      url = url + hash;
+
+      var $el = $( '<span>' ).addClass( className );
+      var $a = $( '<a>' ).attr({
+        'href': url,
+        'target': 'new'
+      }).text( text );
+      $el.append( $a );
+
+      result = $el;
+      return result;
+    };
 
     var $baseColor = $('<span/>')
       .css('background-color', webColor)
@@ -777,6 +823,10 @@ function UserColor(){
 
     // set data
     _set( webColor );
+
+    // 別アプリとの連携機能をとても強引だけど暫定で追加。 2013/04/06
+    $userColor.find( '.try-painting' ).remove();
+    $userColor.find( '.print-user-color' ).after( $tryPaintingBtn() )
 
     return this;
   };

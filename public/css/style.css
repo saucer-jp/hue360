@@ -4,10 +4,10 @@
  * author: Tsukasa Obara
  * url   : http://saucer.jp
  */
-#controller h1, #controller h2, #title, .version, #copyright, #userColor .base-color .print-user-color, #userColor .base-color .remove-btn em, #colorCircle:before, #brightness:before, .ie6:before,
+#controller h1, #controller h2, #title, .version, #copyright, #userColor .base-color .print-user-color, #userColor .base-color .try-painting, #userColor .base-color .remove-btn em, #colorCircle:before, #brightness:before, .ie6:before,
 .ie7:before,
 .ie8:before {
-  font-family: 'Oswald', sans-serif;
+  font-family: "Oswald", sans-serif;
   font-weight: 300;
   letter-spacing: 1px; }
 
@@ -126,6 +126,25 @@ body {
       user-select: none; }
       #userColor .base-color .print-user-color:hover {
         color: #08f; }
+    #userColor .base-color .try-painting {
+      position: absolute;
+      left: 100px;
+      top: 6px;
+      cursor: pointer;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none; }
+      #userColor .base-color .try-painting a {
+        color: #fff;
+        font-size: 10px;
+        text-decoration: none; }
+        #userColor .base-color .try-painting a:hover {
+          color: #08f; }
+      #userColor .base-color .try-painting:before {
+        content: '/';
+        color: #fff;
+        position: absolute;
+        left: -12px; }
     #userColor .base-color .remove-btn {
       width: 60px; }
       #userColor .base-color .remove-btn em {
