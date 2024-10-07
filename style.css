@@ -1,0 +1,45 @@
+body {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px;
+    height: 100vh;  /* 画面全体の高さを使用 */
+    box-sizing: border-box;
+    max-width: 1220px;  /* 最大幅を1220pxに */
+    margin: auto;  /* コンテンツを中央に配置 */
+}
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    width: 100%;  /* 親要素の幅を100%に */
+}
+.slider-container label {
+    margin-bottom: 5px;
+}
+.controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 300px;  /* 左カラムの幅を固定 */
+}
+input[type="range"] {
+    width: 100%;  /* スライダーの横幅を100%に */
+    margin: 0;    /* マージンをゼロに */
+}
+.color-chip {
+    width: 50px;
+    height: 50px;
+    margin: 5px 0;  /* 横方向のギャップをゼロに */
+    display: inline-block;
+}
+#colorChipsContainer {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+canvas {
+    background-color: #fff;
+    width: 800px;  /* 円環の幅を固定 */
+    height: 800px; /* 円環の高さを固定 */
+}
