@@ -1,0 +1,372 @@
+/*!
+ * style.scss
+ * author: Tsukasa Obara
+ * url   : http://saucer.jp
+ */
+
+@import "global_mixins";
+// ********************
+// vendor prefix output flag
+// ********************
+$prefix-webkit:true;
+$prefix-moz:true;
+$prefix-o:false;
+$prefix-ms:false;
+
+// ********************
+// placeholder
+// ********************
+%web-font {
+  font-family: 'Oswald', sans-serif;
+  font-weight:300;
+  letter-spacing:1px;
+}
+%remove-btn {
+  cursor:pointer;
+  position:absolute;
+  width:18px;
+  height:18px;
+  top:5px;
+  right:6px;
+  @include border-radius( 4px );
+  &:hover {
+    background:#08f;
+  }
+  &:before,
+  &:after {
+    content:'';
+    position:absolute;
+    top:8px;
+    left:2px;
+    width:14px;
+    height:1px;
+    background:#fff;
+  }
+  &:before {
+    @include transform( rotate(45deg) );
+  }
+  &:after {
+    @include transform( rotate(135deg) );
+  }
+}
+// ********************
+// style
+// ********************
+html,
+body {
+  height:100%;
+  font-size:12px;
+  overflow:hidden;
+}
+body {
+  background-color:#fff;
+}
+#controller {
+  position:fixed;
+  z-index:200;
+  bottom:4em;
+  left:2em;
+
+  h1 {
+    @extend %web-font;
+    font-size:18px;
+    letter-spacing:4px;
+    margin:0;
+    display:inline-block;
+    padding-left:0.7em;
+    padding-bottom:2em;
+  }
+  h2 {
+    @extend %web-font;
+    font-size:10px;
+    padding-left:2px;
+    margin-bottom:1.5em;
+  }
+  .circle-conf {
+    padding:0 1em 1.5em;
+    float:left;
+    &:last-of-type {
+      clear:left;
+      padding-bottom:0;
+    }
+  }
+  select {
+    width:100px;
+  }
+}
+
+#title {
+  @extend %web-font;
+  font-weight:700;
+  font-size:32px;
+  letter-spacing:6px;
+  position:absolute;
+  left:34px;
+  top:34px;
+  //@include transform( rotate(90deg) );
+}
+.version {
+  @extend %web-font;
+  font-size:10px;
+  position:absolute;
+  top:84px;
+  left:35px;
+}
+#copyright {
+  @extend %web-font;
+  font-size:10px;
+  position:absolute;
+  left:103px;
+  top:84px;
+  //@include transform( rotate(90deg) );
+  .saucer-web {
+    color:#000;
+    text-decoration:none;
+    &:hover {
+      text-decoration:underline;
+    }
+  }
+}
+
+#userColor {
+  overflow-y:hidden;
+  overflow-x:auto;
+  position:fixed;
+  z-index:300;
+  left:3em;
+  right:3em;
+  bottom:0;
+  white-space:nowrap;
+  .selected-color {
+    height:26px;
+    display:inline-block;
+    vertical-align:bottom;
+    position:relative;
+  }
+  .base-color {
+    width:40%;
+    .print-user-color {
+      @extend %web-font;
+      font-size:10px;
+      color:#fff;
+      position:absolute;
+      left:8px;
+      top:8px;
+      cursor:pointer;
+      @include user-select( none );
+      &:hover {
+        color:#08f;
+      }
+    }
+    .try-painting {
+      @extend %web-font;
+      position:absolute;
+      left:100px;
+      top:6px;
+      cursor:pointer;
+      @include user-select( none );
+      a {
+        color:#fff;
+        font-size:10px;
+        text-decoration: none;
+        &:hover {
+          color:#08f;
+        }
+      }
+      &:before {
+        content: '/';
+        color:#fff;
+        position: absolute;
+        left: -12px;
+      }
+    }
+    .remove-btn {
+      width:60px;
+      em {
+        @extend %web-font;
+        font-size:10px;
+        color:transparent;
+        margin-top:3px;
+        margin-left:4px;
+        display:inline-block;
+        @include user-select( none );
+      }
+      &:hover {
+        em {
+          color:#fff;
+        }
+      }
+      &:before,
+      &:after {
+        left:43px;
+      }
+    }
+  }
+  .sub-color {
+    width:80px;
+  }
+  .remove-btn {
+    @extend %remove-btn;
+  }
+}
+
+#colorCircle {
+  position:absolute;
+  width:1040px;
+  height:630px;
+  top:50%;
+  left:50%;
+  margin-top:-328px;
+  margin-left:-520px;
+  &:before {
+    content:'Hue & Chroma >>>';
+    position:absolute;
+    top:116px;
+    left:334px;
+    @extend %web-font;
+    font-size:10px;
+    //@include transform( rotate(45deg) );
+  }
+  .chip:hover {
+    @include box-shadow( 0 0 6px #08f );
+  }
+  .current-base-color {
+    &:before {
+      content:'▼';
+      position:absolute;
+      font-size:10px;
+      width:10px;
+      left:50%;
+      margin-left:-5px;
+      bottom:-14px;
+    }
+  }
+  .circle {
+    .chip {
+      position:absolute;
+      z-index:300;
+    }
+    .color-clash {
+      opacity:0;
+    }
+  }
+}
+
+.white-chip {
+  //background-color:transparent !important;
+  //box-sizing:border-box;
+  //border:1px solid #ddd;
+}
+
+#brightness {
+  position:absolute;
+  z-index:300;
+  top:300px;
+  left:4px;
+  margin:0;
+  padding:0;
+  @include user-select( none );
+  &:before {
+    content:'Brightness >>>';
+    position:absolute;
+    top:-4em;
+    left:0;
+    @extend %web-font;
+    font-size:10px;
+  }
+  .chip{
+    display:inline-block;
+    margin-right:4px;
+    width:30px;
+    height:30px;
+    @include border-radius( 4px );
+    list-style-type:none;
+  }
+  .chip1 {
+    background-color:#FFFFFF;
+    @include box-shadow( 0 0 6px rgba( #000, 0.3 ) );
+  }
+  .chip2 {
+    background-color:#E3E3E3;
+  }
+  .chip3 {
+    background-color:#C6C6C6;
+  }
+  .chip4 {
+    background-color:#AAAAAA;
+  }
+  .chip5 {
+    background-color:#8E8E8E;
+  }
+  .chip6 {
+    background-color:#717171;
+  }
+  .chip7 {
+    background-color:#555555;
+  }
+  .chip8 {
+    background-color:#393939;
+  }
+  .chip9 {
+    background-color:#1C1C1C;
+  }
+  .chip10 {
+    background-color:#000000;
+  }
+  .current-brightness {
+    @include box-shadow( 0 0 6px #08f );
+  }
+}
+
+#print {
+  font-family:helvetica,arial;
+  position:fixed;
+  z-index:500;
+  left:36px;
+  bottom:50px;
+  background:rgba( #eee, 0.8 );
+  @include border-radius( 4px );
+  ul {
+    margin:40px;
+  }
+  li {
+    margin:15px 0;
+  }
+  .chip {
+    display:inline-block;
+    width:60px;
+    height:10px;
+    margin-right:12px;
+  }
+  .key {
+    display:inline-block;
+    width:6em;
+  }
+  .val {
+    display:inline-block;
+    width:4em;
+  }
+  .remove-btn {
+    @extend %remove-btn;
+    background:#ccc;
+  }
+}
+// ********************
+// is IE
+// ********************
+.ie6,
+.ie7,
+.ie8 {
+  #colorCircle,
+  #controller {
+    display:none;
+  }
+  &:before {
+    content:'non-compliant IE6,7,8';
+    @extend %web-font;
+    font-size:26px;
+    position:absolute;
+    top:142px;
+    left:35px;
+  }
+}
