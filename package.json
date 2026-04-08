@@ -2,8 +2,10 @@
   "name": "hue360",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "start": "serve -s public"
+    "start": "serve -s public",
+    "test": "node --test"
   },
   "dependencies": {
     "serve": "^14.2.4"

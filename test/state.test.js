@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  addSelectedColor,
+  clearSelection,
+  createInitialState,
+  removeLastSelectedColor,
+  removeSelectedColor,
+  setBackgroundColor,
+  setBaseColor,
+  setPrintVisible,
+} from '../public/js/core/state.js';
+
+test('setBaseColor resets selection state for a new base color', () => {
+  const initial = createInitialState({ selectedColors: ['#111111'], printVisible: true });
+  const next = setBaseColor(initial, { color: '#abcdef', chipId: 4, brightness: 2 });
+
+  assert.equal(next.baseColor, '#abcdef');
+  assert.equal(next.baseColorId, 4);
+  assert.equal(next.baseColorBrightness, 2);
+  assert.deepEqual(next.selectedColors, []);
+  assert.equal(next.printVisible, false);
+});
+
+test('selected color updates keep the array compact', () => {
+  let state = createInitialState();
+  state = addSelectedColor(state, '#111111');
+  state = addSelectedColor(state, '#222222');
+  state = addSelectedColor(state, '#333333');
+  state = removeSelectedColor(state, 1);
+
+  assert.deepEqual(state.selectedColors, ['#111111', '#333333']);
+
+  state = removeLastSelectedColor(state);
+  assert.deepEqual(state.selectedColors, ['#111111']);
+});
+
+test('clearSelection preserves unrelated state while clearing chosen colors', () => {
+  let state = createInitialState({
+    baseColor: '#ffffff',
+    baseColorId: 1,
+    baseColorBrightness: 4,
+    selectedColors: ['#111111'],
+  });
+  state = setBackgroundColor(state, '#123456');
+  state = setPrintVisible(state, true);
+  state = clearSelection(state);
+
+  assert.equal(state.backgroundColor, '#123456');
+  assert.equal(state.baseColor, null);
+  assert.deepEqual(state.selectedColors, []);
+  assert.equal(state.printVisible, false);
+});
