@@ -1,199 +1,279 @@
 @charset "UTF-8";
-/*
- * style.scss
- * author: Tsukasa Obara
- * url   : http://saucer.jp
- */
-#controller h1, #controller h2, #title, .version, #copyright, #userColor .base-color .print-user-color, #userColor .base-color .try-painting, #userColor .base-color .remove-btn em, #colorCircle:before, #brightness:before, .ie6:before,
-.ie7:before,
-.ie8:before {
-  font-family: "Oswald", sans-serif;
-  font-weight: 300;
-  letter-spacing: 1px; }
 
-#userColor .remove-btn, #print .remove-btn {
-  cursor: pointer;
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  top: 5px;
-  right: 6px;
-  -moz-border-radius: 4px;
-  border-radius: 4px; }
-  #userColor .remove-btn:hover, #print .remove-btn:hover {
-    background: #08f; }
-  #userColor .remove-btn:before, #print .remove-btn:before, #userColor .remove-btn:after, #print .remove-btn:after {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 2px;
-    width: 14px;
-    height: 1px;
-    background: #fff; }
-  #userColor .remove-btn:before, #print .remove-btn:before {
-    -webkit-transform: rotate(45deg);
-    -moz-transform: rotate(45deg);
-    transform: rotate(45deg); }
-  #userColor .remove-btn:after, #print .remove-btn:after {
-    -webkit-transform: rotate(135deg);
-    -moz-transform: rotate(135deg);
-    transform: rotate(135deg); }
+:root {
+  --font-display: "Oswald", sans-serif;
+  --accent-color: #08f;
+  --text-light: #fff;
+  --remove-cross-width: 14px;
+  --remove-cross-height: 1px;
+  --chip-radius: 4px;
+}
+
+:is(
+  #controller h1,
+  #controller h2,
+  #title,
+  .version,
+  #copyright,
+  #userColor .base-color .print-user-color,
+  #userColor .base-color .try-painting,
+  #userColor .base-color .remove-btn em,
+  #colorCircle::before,
+  #brightness::before
+) {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: 1px;
+}
 
 html,
 body {
   height: 100%;
   font-size: 12px;
-  overflow: hidden; }
+  overflow: hidden;
+}
 
 body {
-  background-color: #fff; }
+  background-color: #fff;
+}
 
 #controller {
   position: fixed;
   z-index: 200;
   bottom: 4em;
-  left: 2em; }
-  #controller h1 {
-    font-size: 18px;
-    letter-spacing: 4px;
-    margin: 0;
-    display: inline-block;
-    padding-left: 0.7em;
-    padding-bottom: 2em; }
-  #controller h2 {
-    font-size: 10px;
-    padding-left: 2px;
-    margin-bottom: 1.5em; }
-  #controller .circle-conf {
-    padding: 0 1em 1.5em;
-    float: left; }
-    #controller .circle-conf:last-of-type {
-      clear: left;
-      padding-bottom: 0; }
-  #controller select {
-    width: 100px; }
+  left: 2em;
+}
+
+#controller h1 {
+  margin: 0;
+  display: inline-block;
+  padding-left: 0.7em;
+  padding-bottom: 2em;
+  font-size: 18px;
+  letter-spacing: 4px;
+}
+
+#controller h2 {
+  margin-bottom: 1.5em;
+  padding-left: 2px;
+  font-size: 10px;
+}
+
+#controller .circle-conf {
+  float: left;
+  padding: 0 1em 1.5em;
+}
+
+#controller .circle-conf:last-of-type {
+  clear: left;
+  padding-bottom: 0;
+}
+
+#controller select {
+  width: 100px;
+}
 
 #title {
+  position: absolute;
+  top: 34px;
+  left: 34px;
   font-weight: 700;
   font-size: 32px;
   letter-spacing: 6px;
-  position: absolute;
-  left: 34px;
-  top: 34px; }
+}
 
 .version {
-  font-size: 10px;
   position: absolute;
   top: 84px;
-  left: 35px; }
+  left: 35px;
+  font-size: 10px;
+}
 
 #copyright {
-  font-size: 10px;
   position: absolute;
+  top: 84px;
   left: 103px;
-  top: 84px; }
-  #copyright .saucer-web {
-    color: #000;
-    text-decoration: none; }
-    #copyright .saucer-web:hover {
-      text-decoration: underline; }
+  font-size: 10px;
+}
+
+#copyright .saucer-web {
+  color: #000;
+  text-decoration: none;
+}
+
+#copyright .saucer-web:hover {
+  text-decoration: underline;
+}
 
 #userColor {
-  overflow-y: hidden;
-  overflow-x: auto;
   position: fixed;
   z-index: 300;
-  left: 3em;
   right: 3em;
   bottom: 0;
-  white-space: nowrap; }
-  #userColor .selected-color {
-    height: 26px;
-    display: inline-block;
-    vertical-align: bottom;
-    position: relative; }
-  #userColor .base-color {
-    width: 40%; }
-    #userColor .base-color .print-user-color {
-      font-size: 10px;
-      color: #fff;
-      position: absolute;
-      left: 8px;
-      top: 8px;
-      cursor: pointer;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      user-select: none; }
-      #userColor .base-color .print-user-color:hover {
-        color: #08f; }
-    #userColor .base-color .try-painting {
-      position: absolute;
-      left: 100px;
-      top: 6px;
-      cursor: pointer;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      user-select: none; }
-      #userColor .base-color .try-painting a {
-        color: #fff;
-        font-size: 10px;
-        text-decoration: none; }
-        #userColor .base-color .try-painting a:hover {
-          color: #08f; }
-      #userColor .base-color .try-painting:before {
-        content: '/';
-        color: #fff;
-        position: absolute;
-        left: -12px; }
-    #userColor .base-color .remove-btn {
-      width: 60px; }
-      #userColor .base-color .remove-btn em {
-        font-size: 10px;
-        color: transparent;
-        margin-top: 3px;
-        margin-left: 4px;
-        display: inline-block;
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        user-select: none; }
-      #userColor .base-color .remove-btn:hover em {
-        color: #fff; }
-      #userColor .base-color .remove-btn:before, #userColor .base-color .remove-btn:after {
-        left: 43px; }
-  #userColor .sub-color {
-    width: 80px; }
+  left: 3em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+#userColor .selected-color {
+  position: relative;
+  display: inline-block;
+  height: 26px;
+  vertical-align: bottom;
+}
+
+#userColor .base-color {
+  width: 40%;
+}
+
+#userColor .sub-color {
+  width: 80px;
+}
+
+#userColor .base-color .print-user-color,
+#userColor .base-color .try-painting,
+#userColor .base-color .remove-btn em {
+  user-select: none;
+}
+
+#userColor .base-color .print-user-color {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 10px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+#userColor .base-color .print-user-color:hover {
+  color: var(--accent-color);
+}
+
+#userColor .base-color .try-painting {
+  position: absolute;
+  top: 6px;
+  left: 100px;
+  cursor: pointer;
+}
+
+#userColor .base-color .try-painting a {
+  font-size: 10px;
+  color: var(--text-light);
+  text-decoration: none;
+}
+
+#userColor .base-color .try-painting a:hover {
+  color: var(--accent-color);
+}
+
+#userColor .base-color .try-painting::before {
+  content: "/";
+  position: absolute;
+  left: -12px;
+  color: var(--text-light);
+}
+
+#userColor .base-color .remove-btn {
+  width: 60px;
+}
+
+#userColor .base-color .remove-btn em {
+  display: inline-block;
+  margin-top: 3px;
+  margin-left: 4px;
+  font-size: 10px;
+  color: transparent;
+}
+
+#userColor .base-color .remove-btn:hover em {
+  color: var(--text-light);
+}
+
+#userColor .base-color .remove-btn::before,
+#userColor .base-color .remove-btn::after {
+  left: 43px;
+}
+
+#userColor .remove-btn,
+#print .remove-btn {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  border-radius: var(--chip-radius);
+}
+
+#userColor .remove-btn:hover,
+#print .remove-btn:hover {
+  background: var(--accent-color);
+}
+
+#userColor .remove-btn::before,
+#userColor .remove-btn::after,
+#print .remove-btn::before,
+#print .remove-btn::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 2px;
+  width: var(--remove-cross-width);
+  height: var(--remove-cross-height);
+  background: var(--text-light);
+}
+
+#userColor .remove-btn::before,
+#print .remove-btn::before {
+  transform: rotate(45deg);
+}
+
+#userColor .remove-btn::after,
+#print .remove-btn::after {
+  transform: rotate(135deg);
+}
 
 #colorCircle {
   position: absolute;
-  width: 1040px;
-  height: 630px;
   top: 50%;
   left: 50%;
+  width: 1040px;
+  height: 630px;
   margin-top: -328px;
-  margin-left: -520px; }
-  #colorCircle:before {
-    content: 'Hue & Chroma >>>';
-    position: absolute;
-    top: 116px;
-    left: 334px;
-    font-size: 10px; }
-  #colorCircle .chip:hover {
-    -webkit-box-shadow: 0 0 6px #0088ff;
-    -moz-box-shadow: 0 0 6px #0088ff;
-    box-shadow: 0 0 6px #0088ff; }
-  #colorCircle .current-base-color:before {
-    content: '▼';
-    position: absolute;
-    font-size: 10px;
-    width: 10px;
-    left: 50%;
-    margin-left: -5px;
-    bottom: -14px; }
-  #colorCircle .circle .chip {
-    position: absolute;
-    z-index: 300; }
-  #colorCircle .circle .color-clash {
-    opacity: 0; }
+  margin-left: -520px;
+}
+
+#colorCircle::before {
+  content: "Hue & Chroma >>>";
+  position: absolute;
+  top: 116px;
+  left: 334px;
+  font-size: 10px;
+}
+
+#colorCircle .chip:hover {
+  box-shadow: 0 0 6px var(--accent-color);
+}
+
+#colorCircle .current-base-color::before {
+  content: "▼";
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  width: 10px;
+  margin-left: -5px;
+  font-size: 10px;
+}
+
+#colorCircle .circle .chip {
+  position: absolute;
+  z-index: 300;
+}
+
+#colorCircle .circle .color-clash {
+  opacity: 0;
+}
 
 #brightness {
   position: absolute;
@@ -202,90 +282,80 @@ body {
   left: 4px;
   margin: 0;
   padding: 0;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none; }
-  #brightness:before {
-    content: 'Brightness >>>';
-    position: absolute;
-    top: -4em;
-    left: 0;
-    font-size: 10px; }
-  #brightness .chip {
-    display: inline-block;
-    margin-right: 4px;
-    width: 30px;
-    height: 30px;
-    -moz-border-radius: 4px;
-    border-radius: 4px;
-    list-style-type: none; }
-  #brightness .chip1 {
-    background-color: #FFFFFF;
-    -webkit-box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-    -moz-box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3); }
-  #brightness .chip2 {
-    background-color: #E3E3E3; }
-  #brightness .chip3 {
-    background-color: #C6C6C6; }
-  #brightness .chip4 {
-    background-color: #AAAAAA; }
-  #brightness .chip5 {
-    background-color: #8E8E8E; }
-  #brightness .chip6 {
-    background-color: #717171; }
-  #brightness .chip7 {
-    background-color: #555555; }
-  #brightness .chip8 {
-    background-color: #393939; }
-  #brightness .chip9 {
-    background-color: #1C1C1C; }
-  #brightness .chip10 {
-    background-color: #000000; }
-  #brightness .current-brightness {
-    -webkit-box-shadow: 0 0 6px #0088ff;
-    -moz-box-shadow: 0 0 6px #0088ff;
-    box-shadow: 0 0 6px #0088ff; }
+  user-select: none;
+}
+
+#brightness::before {
+  content: "Brightness >>>";
+  position: absolute;
+  top: -4em;
+  left: 0;
+  font-size: 10px;
+}
+
+#brightness .chip {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  margin-right: 4px;
+  list-style-type: none;
+  border-radius: var(--chip-radius);
+}
+
+#brightness .chip1 {
+  background-color: #fff;
+  box-shadow: 0 0 6px rgb(0 0 0 / 30%);
+}
+
+#brightness .chip2 { background-color: #e3e3e3; }
+#brightness .chip3 { background-color: #c6c6c6; }
+#brightness .chip4 { background-color: #aaa; }
+#brightness .chip5 { background-color: #8e8e8e; }
+#brightness .chip6 { background-color: #717171; }
+#brightness .chip7 { background-color: #555; }
+#brightness .chip8 { background-color: #393939; }
+#brightness .chip9 { background-color: #1c1c1c; }
+#brightness .chip10 { background-color: #000; }
+
+#brightness .current-brightness {
+  box-shadow: 0 0 6px var(--accent-color);
+}
 
 #print {
-  font-family: helvetica,arial;
   position: fixed;
   z-index: 500;
-  left: 36px;
   bottom: 50px;
-  background: rgba(238, 238, 238, 0.8);
-  -moz-border-radius: 4px;
-  border-radius: 4px; }
-  #print ul {
-    margin: 40px; }
-  #print li {
-    margin: 15px 0; }
-  #print .chip {
-    display: inline-block;
-    width: 60px;
-    height: 10px;
-    margin-right: 12px; }
-  #print .key {
-    display: inline-block;
-    width: 6em; }
-  #print .val {
-    display: inline-block;
-    width: 4em; }
-  #print .remove-btn {
-    background: #ccc; }
+  left: 36px;
+  font-family: helvetica, arial, sans-serif;
+  background: rgb(238 238 238 / 80%);
+  border-radius: var(--chip-radius);
+}
 
-.ie6 #colorCircle,
-.ie6 #controller,
-.ie7 #colorCircle,
-.ie7 #controller,
-.ie8 #colorCircle,
-.ie8 #controller {
-  display: none; }
-.ie6:before,
-.ie7:before,
-.ie8:before {
-  content: 'non-compliant IE6,7,8';
-  font-size: 26px;
-  position: absolute;
-  top: 142px;
-  left: 35px; }
+#print ul {
+  margin: 40px;
+}
+
+#print li {
+  margin: 15px 0;
+}
+
+#print .chip {
+  display: inline-block;
+  width: 60px;
+  height: 10px;
+  margin-right: 12px;
+}
+
+#print .key {
+  display: inline-block;
+  width: 6em;
+}
+
+#print .val {
+  display: inline-block;
+  width: 4em;
+}
+
+#print .remove-btn {
+  background: #ccc;
+}
