@@ -1,0 +1,11 @@
+{
+  "name": "hue360",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "serve -s public"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}
