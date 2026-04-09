@@ -98,7 +98,6 @@ body {
 #controller .range-control {
   display: inline-flex;
   flex-direction: column;
-  gap: 6px;
   width: 140px;
 }
 
