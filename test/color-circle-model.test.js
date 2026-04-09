@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createCircleModel, judgeColor } from '../public/js/core/color-circle-model.js';
+import { createCircleModel, getBaseSelection, getHueInterpolation, judgeColor } from '../public/js/core/color-circle-model.js';
 import { createInitialState } from '../public/js/core/state.js';
 
 test('createCircleModel builds hueStep * chromaStep chips', () => {
@@ -30,4 +30,69 @@ test('createCircleModel reuses static data for identical structural inputs', () 
 
   assert.equal(first.staticKey, second.staticKey);
   assert.equal(first.colorStatuses, second.colorStatuses);
+});
+
+test('createCircleModel supports non-decimal hue steps', () => {
+  const state = createInitialState({ colorSpace: 'rgb', hueStep: 17, chromaStep: 4 });
+  const model = createCircleModel(state);
+
+  assert.equal(model.chips.length, 68);
+  assert.ok(model.chips.every((chip) => /^#[0-9a-f]{6}$/i.test(chip.color)));
+});
+
+test('createCircleModel supports full chroma range', () => {
+  const low = createCircleModel(createInitialState({ hueStep: 17, chromaStep: 3 }));
+  const high = createCircleModel(createInitialState({ hueStep: 17, chromaStep: 10 }));
+
+  assert.equal(low.chips.length, 51);
+  assert.equal(high.chips.length, 170);
+});
+
+test('getHueInterpolation keeps blend within a single segment across full rotations', () => {
+  const samples = [0, 1, 8, 16, 19, 20, 21, 40, 99];
+
+  for (const hueIndex of samples) {
+    const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, 20, 10);
+    assert.ok(startIndex >= 0 && startIndex < 10);
+    assert.ok(endIndex >= 0 && endIndex < 10);
+    assert.ok(blend >= 0 && blend < 1, `blend out of range for hueIndex=${hueIndex}: ${blend}`);
+  }
+});
+
+test('same spoke keeps a stable hue family across chroma rings', () => {
+  const model = createCircleModel(createInitialState({ colorSpace: 'munsell', hueStep: 20, chromaStep: 7 }));
+  const spokeIndex = 0;
+  const spokeHues = Array.from({ length: 7 }, (_, ring) => model.colorStatuses[ring * 20 + spokeIndex].hsb.h);
+  const circularDiffs = spokeHues.slice(1).map((hue, index) => {
+    const prev = spokeHues[index];
+    const diff = Math.abs(hue - prev);
+    return Math.min(diff, 360 - diff);
+  });
+
+  assert.ok(circularDiffs.every((diff) => diff < 20), `spoke hue drift too large: ${spokeHues.join(', ')}`);
+});
+
+test('base selection keeps the chosen hue angle stable when hueStep changes', () => {
+  const initialState = createInitialState({
+    hueStep: 20,
+    chromaStep: 7,
+    baseColor: '#5d639e',
+    baseColorId: 7,
+    baseHueAngle: 126,
+    baseChromaIndex: 0,
+    baseColorBrightness: 0,
+  });
+  const nextState = {
+    ...initialState,
+    hueStep: 22,
+  };
+
+  const baseSelection = getBaseSelection(nextState);
+  const model = createCircleModel(nextState);
+  const baseChip = model.chips[baseSelection.selectedChipId];
+
+  assert.equal(baseSelection.selectedChipId, 8);
+  assert.ok(Math.abs(baseChip.deg - 126) < 0.000001, `expected anchored angle 126, got ${baseChip.deg}`);
+  assert.equal(model.selectedChipId, baseSelection.selectedChipId);
+  assert.equal(baseChip.isBaseColor, true);
 });

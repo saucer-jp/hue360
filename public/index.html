@@ -31,28 +31,16 @@
         </select>
       </div>
       <div class="circle-conf">
-        <h2>Hue Step</h2>
-        <select id="hueStep" data-setting="hueStep">
-          <option value="10">10</option>
-          <option value="20" selected="selected">20</option>
-          <option value="30">30</option>
-          <option value="40">40</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
+        <h2>Hue Step <span class="range-value">(<span data-setting-value="hueStep">20</span>)</span></h2>
+        <label class="range-control" for="hueStep">
+          <input id="hueStep" type="range" min="10" max="100" step="1" value="20" data-setting="hueStep">
+        </label>
       </div>
       <div class="circle-conf">
-        <h2>Chroma Step</h2>
-        <select id="chromaStep" data-setting="chromaStep">
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7" selected="selected">7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-          <option value="10">10</option>
-        </select>
+        <h2>Chroma Step <span class="range-value">(<span data-setting-value="chromaStep">7</span>)</span></h2>
+        <label class="range-control" for="chromaStep">
+          <input id="chromaStep" type="range" min="3" max="10" step="1" value="7" data-setting="chromaStep">
+        </label>
       </div>
       <div class="circle-conf">
         <h2>M&S Judge</h2>

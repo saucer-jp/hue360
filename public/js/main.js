@@ -36,6 +36,26 @@ let appState = createInitialState({
 
 const renderCircle = createCircleRenderer(nodes.colorCircle);
 
+function syncBaseColor(state) {
+  if (!state.baseColor) {
+    return state;
+  }
+
+  const circleModel = createCircleModel(state);
+  const selectedChipId = circleModel.selectedChipId;
+  const selectedStatus = selectedChipId == null ? null : circleModel.colorStatuses[selectedChipId];
+  if (!selectedStatus) {
+    return state;
+  }
+
+  return {
+    ...state,
+    baseColorId: selectedChipId,
+    baseColor: selectedStatus.web,
+    baseChromaIndex: Math.floor(selectedChipId / state.hueStep),
+  };
+}
+
 function renderBodySection() {
   nodes.body.style.backgroundColor = appState.backgroundColor;
 }
@@ -62,22 +82,30 @@ function renderApp() {
 function applyControllerValue(setting, value) {
   const normalizedValue =
     setting === 'judgeEnabled' ? value === 'true' : Number.isNaN(Number(value)) ? value : Number(value);
-  appState = updateSetting(appState, setting, normalizedValue);
+  let nextState = updateSetting(appState, setting, normalizedValue);
+  if (setting !== 'judgeEnabled') {
+    nextState = syncBaseColor(nextState);
+  }
+
+  appState = nextState;
   renderControllerSection();
   renderCircleSection();
 }
 
-nodes.controller.addEventListener('change', (event) => {
-  const select = event.target.closest('select[data-setting]');
-  if (!select) {
+function handleControllerInput(event) {
+  const control = event.target.closest('[data-setting]');
+  if (!control) {
     return;
   }
 
-  applyControllerValue(select.dataset.setting, select.value);
-});
+  applyControllerValue(control.dataset.setting, control.value);
+}
+
+nodes.controller.addEventListener('change', handleControllerInput);
+nodes.controller.addEventListener('input', handleControllerInput);
 
 delegate(nodes.brightness, 'click', '.chip', (_, chip) => {
-  appState = setBrightness(appState, Number(chip.dataset.brightness));
+  appState = syncBaseColor(setBrightness(appState, Number(chip.dataset.brightness)));
   renderControllerSection();
   renderCircleSection();
 });
@@ -95,9 +123,12 @@ delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
   }
 
   if (!appState.baseColor) {
+    const chipId = Number(chip.dataset.chipId);
     appState = setBaseColor(appState, {
       color: chipColor,
-      chipId: Number(chip.dataset.chipId),
+      chipId,
+      hueAngle: (360 / appState.hueStep) * (chipId % appState.hueStep),
+      chromaIndex: Math.floor(chipId / appState.hueStep),
       brightness: appState.brightness,
     });
     renderCircleSection();

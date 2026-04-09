@@ -29,7 +29,60 @@ const LAYOUT = {
 const staticCircleCache = new Map();
 const darkestBrightnessHsb = webToHsb(FIXED_COLORS.brightness.at(-1));
 
-function getBetweenColor(stepSize, stepCount, startColor, endColor) {
+function normalizeHueIndex(index, hueStep) {
+  return ((index % hueStep) + hueStep) % hueStep;
+}
+
+export function getBaseSelection(state) {
+  if (!state.baseColor && state.baseColorId == null) {
+    return {
+      selectedChipId: null,
+      selectedHueIndex: null,
+      selectedChromaIndex: null,
+      rotationOffset: 0,
+    };
+  }
+
+  const selectedChromaIndex = Math.max(0, Math.min(state.baseChromaIndex ?? 0, state.chromaStep - 1));
+  if (typeof state.baseHueAngle !== 'number') {
+    const fallbackChipId = state.baseColorId ?? null;
+    const fallbackHueIndex = fallbackChipId == null ? null : normalizeHueIndex(fallbackChipId, state.hueStep);
+
+    return {
+      selectedChipId: fallbackChipId,
+      selectedHueIndex: fallbackHueIndex,
+      selectedChromaIndex,
+      rotationOffset: 0,
+    };
+  }
+
+  const stepAngle = 360 / state.hueStep;
+  const selectedHueIndex = normalizeHueIndex(Math.round(state.baseHueAngle / stepAngle), state.hueStep);
+  const rotationOffset = state.baseHueAngle - selectedHueIndex * stepAngle;
+
+  return {
+    selectedChipId: selectedChromaIndex * state.hueStep + selectedHueIndex,
+    selectedHueIndex,
+    selectedChromaIndex,
+    rotationOffset,
+  };
+}
+
+export function getHueInterpolation(hueIndex, hueCount, colorCount) {
+  const rawPosition = (hueIndex / hueCount) * colorCount;
+  const position = rawPosition % colorCount;
+  const startIndex = Math.floor(position);
+  const endIndex = (startIndex + 1) % colorCount;
+  const blend = position - startIndex;
+
+  return {
+    startIndex,
+    endIndex,
+    blend,
+  };
+}
+
+function getBetweenColor(startColor, endColor, blend) {
   const start = webToHsb(startColor);
   const end = webToHsb(endColor);
   const max = {
@@ -47,7 +100,7 @@ function getBetweenColor(stepSize, stepCount, startColor, endColor) {
 
   if (max.h - min.h > 180) {
     const wrappedHue = 360 - max.h;
-    range.h = ((wrappedHue + min.h) / stepSize) * (stepCount - 1);
+    range.h = (wrappedHue + min.h) * blend;
     if (max.h === start.h) {
       hsb.h = start.h + range.h;
       if (hsb.h >= 360) {
@@ -55,7 +108,7 @@ function getBetweenColor(stepSize, stepCount, startColor, endColor) {
       }
     }
   } else {
-    range.h = ((max.h - min.h) / stepSize) * (stepCount - 1);
+    range.h = (max.h - min.h) * blend;
     if (max.h === start.h) {
       hsb.h = start.h - range.h;
     }
@@ -65,10 +118,10 @@ function getBetweenColor(stepSize, stepCount, startColor, endColor) {
     hsb.h = start.h + range.h;
   }
 
-  range.s = ((max.s - min.s) / stepSize) * (stepCount - 1);
+  range.s = (max.s - min.s) * blend;
   hsb.s = max.s === start.s ? start.s - range.s : start.s + range.s;
 
-  range.b = ((max.b - min.b) / stepSize) * (stepCount - 1);
+  range.b = (max.b - min.b) * blend;
   hsb.b = max.b === start.b ? start.b - range.b : start.b + range.b;
 
   return hsbToWeb(hsb);
@@ -105,10 +158,14 @@ function applyBrightness(webColor, count, state) {
   return hsbToWeb(hsb);
 }
 
-function getWebColor(stepSize, count, state, fixedColors) {
-  const startColor = fixedColors[count.startColor];
-  const endColor = fixedColors[count.endColor] ?? fixedColors[0];
-  let webColor = count.step === 1 ? startColor : getBetweenColor(stepSize, count.step, startColor, endColor);
+function getWebColor(hueIndex, state, fixedColors, hueCount) {
+  const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, hueCount, fixedColors.length);
+  let webColor = blend === 0 ? fixedColors[startIndex] : getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
+
+  const count = {
+    chroma: Math.floor(hueIndex / hueCount) + 1,
+  };
+
   webColor = applyFlatBrightness(webColor, state);
   webColor = applyChroma(webColor, count, state);
   return applyBrightness(webColor, count, state);
@@ -116,47 +173,24 @@ function getWebColor(stepSize, count, state, fixedColors) {
 
 export function createColorStatuses(state) {
   const fixedColors = FIXED_COLORS[state.colorSpace];
-  const stepSize = state.hueStep / fixedColors.length;
   const total = state.hueStep * state.chromaStep;
   const result = [];
-  const count = {
-    hue: 1,
-    chroma: 1,
-    step: 1,
-    startColor: 0,
-    endColor: 1,
-  };
 
   for (let index = 0; index < total; index += 1) {
-    const web = getWebColor(stepSize, count, state, fixedColors);
+    const hueIndex = index % state.hueStep;
+    const chromaIndex = Math.floor(index / state.hueStep);
+    const web = getWebColor(index, state, fixedColors, state.hueStep);
     result.push({
       id: index,
       web,
       rgb: webToRgb(web),
       hsb: webToHsb(web),
       stepNum: {
-        hue: count.hue,
-        chroma: count.chroma,
+        hue: hueIndex + 1,
+        chroma: chromaIndex + 1,
         brightness: state.brightness,
       },
     });
-
-    if (count.step === stepSize) {
-      count.step = 1;
-      count.startColor += 1;
-      count.endColor += 1;
-    } else {
-      count.step += 1;
-    }
-
-    if (count.hue === state.hueStep) {
-      count.hue = 1;
-      count.chroma += 1;
-      count.startColor = 0;
-      count.endColor = 1;
-    } else {
-      count.hue += 1;
-    }
   }
 
   return result;
@@ -169,9 +203,10 @@ export function createChipStatuses(state) {
   let chromaCount = 1;
 
   for (let index = 0; index < total; index += 1) {
+    const hueIndex = index % state.hueStep;
     result.push({
       id: index,
-      deg: (360 / state.hueStep) * index,
+      deg: (360 / state.hueStep) * hueIndex,
       radius: LAYOUT.radius - (LAYOUT.radius * 2 - (LAYOUT.chipSize + 2) * (chromaCount - 1)),
       scale: 1,
       chipSize: LAYOUT.chipSize,
@@ -190,7 +225,8 @@ export function createChipStatuses(state) {
 
 function createBaseAnalysis(colorStatuses, state) {
   const brightnessStep = 10;
-  const baseStatus = colorStatuses[state.baseColorId];
+  const { selectedChipId } = getBaseSelection(state);
+  const baseStatus = selectedChipId == null ? null : colorStatuses[selectedChipId];
 
   if (!baseStatus) {
     return null;
@@ -218,7 +254,8 @@ function createBaseAnalysis(colorStatuses, state) {
 }
 
 export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
-  if (state.baseColorId == null || !state.judgeEnabled) {
+  const { selectedChipId } = getBaseSelection(state);
+  if (selectedChipId == null || !state.judgeEnabled) {
     return true;
   }
 
@@ -307,6 +344,7 @@ function getStaticCircleData(state) {
 export function createCircleModel(state) {
   const staticKey = createStaticKey(state);
   const { colorStatuses, chipStatuses } = getStaticCircleData(state);
+  const { selectedChipId, rotationOffset } = getBaseSelection(state);
   const baseAnalysis = createBaseAnalysis(colorStatuses, state);
 
   const chips = colorStatuses.map((colorStatus, index) => {
@@ -316,11 +354,11 @@ export function createCircleModel(state) {
     return {
       id: index,
       color: colorStatus.web,
-      deg: chipStatus.deg,
+      deg: chipStatus.deg + rotationOffset,
       radius: chipStatus.radius,
       scale: chipStatus.scale,
       size: chipStatus.chipSize,
-      isBaseColor: state.baseColorId === index || colorStatus.web === state.baseColor,
+      isBaseColor: selectedChipId === index,
       isClashing,
     };
   });
@@ -330,6 +368,7 @@ export function createCircleModel(state) {
     colorStatuses,
     layout: LAYOUT,
     colorSpace: state.colorSpace,
+    selectedChipId,
     staticKey,
   };
 }
