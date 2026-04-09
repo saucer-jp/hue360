@@ -95,6 +95,21 @@ body {
   width: 100px;
 }
 
+#controller .range-control {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 140px;
+}
+
+#controller .range-value {
+  font-size: 10px;
+}
+
+#controller input[type="range"] {
+  width: 100%;
+}
+
 #title {
   position: absolute;
   top: 34px;

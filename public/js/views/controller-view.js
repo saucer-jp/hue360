@@ -1,13 +1,18 @@
 import { qsa } from '../utils/dom.js';
 
 export function renderController(state, root) {
-  qsa('select[data-setting]', root).forEach((select) => {
-    const key = select.dataset.setting;
+  qsa('[data-setting]', root).forEach((input) => {
+    const key = input.dataset.setting;
     if (key === 'judgeEnabled') {
-      select.value = String(state.judgeEnabled);
+      input.value = String(state.judgeEnabled);
     } else {
-      select.value = String(state[key]);
+      input.value = String(state[key]);
     }
+  });
+
+  qsa('[data-setting-value]', root).forEach((valueNode) => {
+    const key = valueNode.dataset.settingValue;
+    valueNode.textContent = String(state[key]);
   });
 
   qsa('#brightness .chip', root.ownerDocument).forEach((chip) => {

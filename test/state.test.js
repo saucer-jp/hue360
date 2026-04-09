@@ -14,10 +14,18 @@ import {
 
 test('setBaseColor resets selection state for a new base color', () => {
   const initial = createInitialState({ selectedColors: ['#111111'], printVisible: true });
-  const next = setBaseColor(initial, { color: '#abcdef', chipId: 4, brightness: 2 });
+  const next = setBaseColor(initial, {
+    color: '#abcdef',
+    chipId: 4,
+    hueAngle: 72,
+    chromaIndex: 1,
+    brightness: 2,
+  });
 
   assert.equal(next.baseColor, '#abcdef');
   assert.equal(next.baseColorId, 4);
+  assert.equal(next.baseHueAngle, 72);
+  assert.equal(next.baseChromaIndex, 1);
   assert.equal(next.baseColorBrightness, 2);
   assert.deepEqual(next.selectedColors, []);
   assert.equal(next.printVisible, false);
@@ -40,6 +48,8 @@ test('clearSelection preserves unrelated state while clearing chosen colors', ()
   let state = createInitialState({
     baseColor: '#ffffff',
     baseColorId: 1,
+    baseHueAngle: 18,
+    baseChromaIndex: 0,
     baseColorBrightness: 4,
     selectedColors: ['#111111'],
   });
@@ -49,6 +59,8 @@ test('clearSelection preserves unrelated state while clearing chosen colors', ()
 
   assert.equal(state.backgroundColor, '#123456');
   assert.equal(state.baseColor, null);
+  assert.equal(state.baseHueAngle, null);
+  assert.equal(state.baseChromaIndex, null);
   assert.deepEqual(state.selectedColors, []);
   assert.equal(state.printVisible, false);
 });
