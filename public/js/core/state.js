@@ -1,8 +1,8 @@
 export function createInitialState(overrides = {}) {
   return {
     colorSpace: 'munsell',
-    hueStep: 20,
-    chromaStep: 7,
+    hueStep: 42,
+    chromaStep: 3,
     brightness: 0,
     judgeEnabled: true,
     baseColor: null,
