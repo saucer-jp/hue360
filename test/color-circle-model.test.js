@@ -96,3 +96,21 @@ test('base selection keeps the chosen hue angle stable when hueStep changes', ()
   assert.equal(model.selectedChipId, baseSelection.selectedChipId);
   assert.equal(baseChip.isBaseColor, true);
 });
+
+test('palest chroma ring keeps slight color instead of collapsing to pure white', () => {
+  for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
+    const state = createInitialState({
+      colorSpace,
+      hueStep: 20,
+      chromaStep: 7,
+      brightness: 0,
+    });
+    const model = createCircleModel(state);
+    const palestRing = model.colorStatuses.slice((state.chromaStep - 1) * state.hueStep);
+
+    assert.ok(
+      palestRing.every((chip) => chip.web.toLowerCase() !== '#ffffff'),
+      `${colorSpace} palest ring still contains pure white: ${palestRing.map((chip) => chip.web).join(', ')}`
+    );
+  }
+});
