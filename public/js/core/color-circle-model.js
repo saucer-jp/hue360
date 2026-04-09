@@ -28,6 +28,8 @@ const LAYOUT = {
 
 const staticCircleCache = new Map();
 const darkestBrightnessHsb = webToHsb(FIXED_COLORS.brightness.at(-1));
+const CHROMA_MIN_SATURATION_RATIO = 0.12;
+const CHROMA_BRIGHTNESS_HEADROOM = 8;
 
 function normalizeHueIndex(index, hueStep) {
   return ((index % hueStep) + hueStep) % hueStep;
@@ -136,8 +138,11 @@ function applyFlatBrightness(webColor, state) {
 
 function applyChroma(webColor, count, state) {
   const hsb = webToHsb(webColor);
+  const originalSaturation = hsb.s;
   const range = hsb.s / (state.chromaStep - 1);
-  hsb.s -= range * (count.chroma - 1);
+  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
+  const minimumSaturation = Math.round(originalSaturation * CHROMA_MIN_SATURATION_RATIO * chromaProgress);
+  hsb.s = Math.max(minimumSaturation, hsb.s - range * (count.chroma - 1));
   return hsbToWeb(hsb);
 }
 
@@ -154,6 +159,10 @@ function applyBrightness(webColor, count, state) {
   } else {
     hsb.b += offset;
   }
+
+  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
+  const maxBrightness = 255 - Math.round(CHROMA_BRIGHTNESS_HEADROOM * chromaProgress);
+  hsb.b = Math.min(hsb.b, maxBrightness);
 
   return hsbToWeb(hsb);
 }
