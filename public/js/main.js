@@ -104,7 +104,16 @@ function handleControllerInput(event) {
 nodes.controller.addEventListener('change', handleControllerInput);
 nodes.controller.addEventListener('input', handleControllerInput);
 
-delegate(nodes.brightness, 'click', '.chip', (_, chip) => {
+delegate(nodes.brightness, 'click', '.chip', (event, chip) => {
+  if (event.shiftKey) {
+    appState = setBackgroundColor(appState, normalizeCssColor(getComputedStyle(chip).backgroundColor));
+    renderBodySection();
+    if (appState.printVisible) {
+      renderUserColorSection();
+    }
+    return;
+  }
+
   appState = syncBaseColor(setBrightness(appState, Number(chip.dataset.brightness)));
   renderControllerSection();
   renderCircleSection();
