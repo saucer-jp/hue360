@@ -9,6 +9,29 @@
   --chip-radius: 4px;
 }
 
+html,
+body,
+h1,
+h2,
+ul,
+li,
+p,
+small {
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+
 :is(
   #controller h1,
   #controller h2,
@@ -35,6 +58,7 @@ body {
 
 body {
   background-color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 #controller {
@@ -280,8 +304,6 @@ body {
   z-index: 300;
   top: 300px;
   left: 4px;
-  margin: 0;
-  padding: 0;
   user-select: none;
 }
 
@@ -298,7 +320,6 @@ body {
   width: 30px;
   height: 30px;
   margin-right: 4px;
-  list-style-type: none;
   border-radius: var(--chip-radius);
 }
 
