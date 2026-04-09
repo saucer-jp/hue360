@@ -36,7 +36,6 @@ textarea {
   #controller h1,
   #controller h2,
   #title,
-  #copyright,
   #userColor .base-color .print-user-color,
   #userColor .base-color .try-painting,
   #userColor .base-color .remove-btn em,
@@ -103,22 +102,6 @@ body {
   font-weight: 700;
   font-size: 32px;
   letter-spacing: 6px;
-}
-
-#copyright {
-  position: absolute;
-  top: 84px;
-  left: 103px;
-  font-size: 10px;
-}
-
-#copyright .saucer-web {
-  color: #000;
-  text-decoration: none;
-}
-
-#copyright .saucer-web:hover {
-  text-decoration: underline;
 }
 
 #userColor {
