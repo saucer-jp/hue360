@@ -26,6 +26,9 @@ const LAYOUT = {
   clashClass: 'color-clash',
 };
 
+const staticCircleCache = new Map();
+const darkestBrightnessHsb = webToHsb(FIXED_COLORS.brightness.at(-1));
+
 function getBetweenColor(stepSize, stepCount, startColor, endColor) {
   const start = webToHsb(startColor);
   const end = webToHsb(endColor);
@@ -57,6 +60,7 @@ function getBetweenColor(stepSize, stepCount, startColor, endColor) {
       hsb.h = start.h - range.h;
     }
   }
+
   if (max.h === end.h) {
     hsb.h = start.h + range.h;
   }
@@ -72,8 +76,7 @@ function getBetweenColor(stepSize, stepCount, startColor, endColor) {
 
 function applyFlatBrightness(webColor, state) {
   const hsb = webToHsb(webColor);
-  const endColor = webToHsb(FIXED_COLORS.brightness.at(-1));
-  const range = (hsb.b - endColor.b) / FIXED_COLORS.brightness.length;
+  const range = (hsb.b - darkestBrightnessHsb.b) / FIXED_COLORS.brightness.length;
   hsb.b -= range * state.brightness;
   return hsbToWeb(hsb);
 }
@@ -185,29 +188,56 @@ export function createChipStatuses(state) {
   return result;
 }
 
-export function judgeColor(colorStatuses, state, id) {
+function createBaseAnalysis(colorStatuses, state) {
+  const brightnessStep = 10;
+  const baseStatus = colorStatuses[state.baseColorId];
+
+  if (!baseStatus) {
+    return null;
+  }
+
+  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb+') {
+    return {
+      kind: 'step',
+      base: {
+        stepHue: baseStatus.stepNum.hue,
+        stepChroma: baseStatus.stepNum.chroma,
+        stepBrightness: (state.baseColorBrightness * 10) / brightnessStep,
+      },
+      brightnessStep,
+      justNoticeableBrightnessDiff: 0.1,
+    };
+  }
+
+  return {
+    kind: 'hsb',
+    base: webToHsb(state.baseColor),
+    brightnessStep,
+    justNoticeableBrightnessDiff: brightnessStep / 255,
+  };
+}
+
+export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
   if (state.baseColorId == null || !state.judgeEnabled) {
     return true;
   }
 
-  const brightnessStep = 10;
-  const baseStatus = colorStatuses[state.baseColorId];
   const targetStatus = colorStatuses[id];
+  const analysis = baseAnalysis ?? createBaseAnalysis(colorStatuses, state);
 
-  if (!baseStatus || !targetStatus) {
+  if (!targetStatus || !analysis) {
     return true;
   }
 
   let H;
   let S;
   let B;
-  let justNoticeableBrightnessDiff;
 
-  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb+') {
+  if (analysis.kind === 'step') {
     const base = {
-      h: baseStatus.stepNum.hue,
-      s: baseStatus.stepNum.chroma,
-      b: (state.baseColorBrightness * 10) / brightnessStep,
+      h: analysis.base.stepHue,
+      s: analysis.base.stepChroma,
+      b: analysis.base.stepBrightness,
     };
     const target = {
       h: targetStatus.stepNum.hue,
@@ -219,15 +249,14 @@ export function judgeColor(colorStatuses, state, id) {
     const minH = (Math.min(base.h, target.h) - 1) * (360 / state.hueStep);
     const maxS = (Math.max(base.s, target.s) * 14) / state.chromaStep;
     const minS = (Math.min(base.s, target.s) * 14) / state.chromaStep;
-    const maxB = (Math.max(base.b, target.b) * 10) / brightnessStep;
-    const minB = (Math.min(base.b, target.b) * 10) / brightnessStep;
+    const maxB = (Math.max(base.b, target.b) * 10) / analysis.brightnessStep;
+    const minB = (Math.min(base.b, target.b) * 10) / analysis.brightnessStep;
 
     H = maxH - minH > 180 ? 360 - maxH + minH : maxH - minH;
     S = maxS - minS;
     B = maxB - minB;
-    justNoticeableBrightnessDiff = 0.1;
   } else {
-    const base = webToHsb(state.baseColor);
+    const base = analysis.base;
     const target = webToHsb(targetStatus.web);
     const maxH = Math.max(base.h, target.h);
     const minH = Math.min(base.h, target.h);
@@ -238,8 +267,7 @@ export function judgeColor(colorStatuses, state, id) {
 
     H = maxH - minH > 180 ? 360 - maxH + minH : maxH - minH;
     S = (state.chromaStep * (maxS - minS)) / 255;
-    B = (brightnessStep * (maxB - minB)) / 255;
-    justNoticeableBrightnessDiff = brightnessStep / 255;
+    B = (analysis.brightnessStep * (maxB - minB)) / 255;
   }
 
   if ((H > 1 && H <= 25) || (H > 43 && H <= 100)) {
@@ -250,20 +278,40 @@ export function judgeColor(colorStatuses, state, id) {
     return false;
   }
 
-  if ((B > justNoticeableBrightnessDiff && B <= 0.5) || (B > 1.5 && B <= 2.5)) {
+  if ((B > analysis.justNoticeableBrightnessDiff && B <= 0.5) || (B > 1.5 && B <= 2.5)) {
     return false;
   }
 
   return true;
 }
 
+function createStaticKey(state) {
+  return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness].join(':');
+}
+
+function getStaticCircleData(state) {
+  const cacheKey = createStaticKey(state);
+  if (staticCircleCache.has(cacheKey)) {
+    return staticCircleCache.get(cacheKey);
+  }
+
+  const staticData = {
+    colorStatuses: createColorStatuses(state),
+    chipStatuses: createChipStatuses(state),
+  };
+
+  staticCircleCache.set(cacheKey, staticData);
+  return staticData;
+}
+
 export function createCircleModel(state) {
-  const colorStatuses = createColorStatuses(state);
-  const chipStatuses = createChipStatuses(state);
+  const staticKey = createStaticKey(state);
+  const { colorStatuses, chipStatuses } = getStaticCircleData(state);
+  const baseAnalysis = createBaseAnalysis(colorStatuses, state);
 
   const chips = colorStatuses.map((colorStatus, index) => {
     const chipStatus = chipStatuses[index];
-    const isClashing = !judgeColor(colorStatuses, state, index);
+    const isClashing = !judgeColor(colorStatuses, state, index, baseAnalysis);
 
     return {
       id: index,
@@ -282,6 +330,7 @@ export function createCircleModel(state) {
     colorStatuses,
     layout: LAYOUT,
     colorSpace: state.colorSpace,
+    staticKey,
   };
 }
 

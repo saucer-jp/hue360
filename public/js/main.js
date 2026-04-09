@@ -15,7 +15,7 @@ import { normalizeCssColor } from './utils/color-format.js';
 import { delegate, qs } from './utils/dom.js';
 import { getUserInfo } from './utils/user-agent.js';
 import { renderController } from './views/controller-view.js';
-import { renderCircle } from './views/circle-view.js';
+import { createCircleRenderer } from './views/circle-view.js';
 import { renderUserColorPanels } from './views/user-color-view.js';
 
 const nodes = {
@@ -34,18 +34,37 @@ let appState = createInitialState({
   backgroundColor: normalizeCssColor(getComputedStyle(nodes.body).backgroundColor),
 });
 
-function renderApp() {
+const renderCircle = createCircleRenderer(nodes.colorCircle);
+
+function renderBodySection() {
   nodes.body.style.backgroundColor = appState.backgroundColor;
+}
+
+function renderControllerSection() {
   renderController(appState, nodes.controller);
-  renderCircle(nodes.colorCircle, createCircleModel(appState));
+}
+
+function renderCircleSection() {
+  renderCircle(createCircleModel(appState));
+}
+
+function renderUserColorSection() {
   renderUserColorPanels(nodes.userColor, nodes.print, appState);
+}
+
+function renderApp() {
+  renderBodySection();
+  renderControllerSection();
+  renderCircleSection();
+  renderUserColorSection();
 }
 
 function applyControllerValue(setting, value) {
   const normalizedValue =
     setting === 'judgeEnabled' ? value === 'true' : Number.isNaN(Number(value)) ? value : Number(value);
   appState = updateSetting(appState, setting, normalizedValue);
-  renderApp();
+  renderControllerSection();
+  renderCircleSection();
 }
 
 nodes.controller.addEventListener('change', (event) => {
@@ -59,7 +78,8 @@ nodes.controller.addEventListener('change', (event) => {
 
 delegate(nodes.brightness, 'click', '.chip', (_, chip) => {
   appState = setBrightness(appState, Number(chip.dataset.brightness));
-  renderApp();
+  renderControllerSection();
+  renderCircleSection();
 });
 
 delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
@@ -67,7 +87,10 @@ delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
 
   if (event.shiftKey) {
     appState = setBackgroundColor(appState, chipColor);
-    renderApp();
+    renderBodySection();
+    if (appState.printVisible) {
+      renderUserColorSection();
+    }
     return;
   }
 
@@ -77,34 +100,38 @@ delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
       chipId: Number(chip.dataset.chipId),
       brightness: appState.brightness,
     });
-  } else {
-    appState = addSelectedColor(appState, chipColor);
+    renderCircleSection();
+    renderUserColorSection();
+    return;
   }
 
-  renderApp();
+  appState = addSelectedColor(appState, chipColor);
+  renderUserColorSection();
 });
 
 delegate(nodes.userColor, 'click', '[data-action]', (_, actionNode) => {
   switch (actionNode.dataset.action) {
     case 'print':
       appState = setPrintVisible(appState, true);
-      break;
+      renderUserColorSection();
+      return;
     case 'clear-all':
       appState = clearSelection(appState);
-      break;
+      renderCircleSection();
+      renderUserColorSection();
+      return;
     case 'remove-sub-color':
       appState = removeSelectedColor(appState, Number(actionNode.dataset.index));
-      break;
+      renderUserColorSection();
+      return;
     default:
       return;
   }
-
-  renderApp();
 });
 
 delegate(nodes.print, 'click', '[data-action="clear-print"]', () => {
   appState = setPrintVisible(appState, false);
-  renderApp();
+  renderUserColorSection();
 });
 
 document.addEventListener('keydown', (event) => {
@@ -118,7 +145,7 @@ document.addEventListener('keydown', (event) => {
 
   event.preventDefault();
   appState = removeLastSelectedColor(appState);
-  renderApp();
+  renderUserColorSection();
 });
 
 renderApp();

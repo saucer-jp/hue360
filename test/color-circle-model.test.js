@@ -23,3 +23,11 @@ test('judgeColor returns a boolean for representative base/target chips', () => 
   assert.equal(typeof judgeColor(model.colorStatuses, state, 5), 'boolean');
   assert.equal(typeof judgeColor(model.colorStatuses, state, 40), 'boolean');
 });
+
+test('createCircleModel reuses static data for identical structural inputs', () => {
+  const first = createCircleModel(createInitialState({ colorSpace: 'rgb', hueStep: 20, chromaStep: 7, brightness: 2 }));
+  const second = createCircleModel(createInitialState({ colorSpace: 'rgb', hueStep: 20, chromaStep: 7, brightness: 2 }));
+
+  assert.equal(first.staticKey, second.staticKey);
+  assert.equal(first.colorStatuses, second.colorStatuses);
+});
