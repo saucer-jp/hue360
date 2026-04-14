@@ -2,6 +2,8 @@
 
 HUE/360 は、色相環ベースで配色を確認・調整できるシンプルな Web アプリです。
 
+AI エージェント向けの作業ルールは [AGENTS.md](/Users/saucerjp/works/saucer/develop/hue360/hue360/AGENTS.md) を参照してください。
+
 ## Development
 
 依存関係をインストール:
