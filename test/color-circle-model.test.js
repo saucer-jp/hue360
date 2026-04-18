@@ -2,12 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createCircleModel, getBaseSelection, getHueInterpolation, judgeColor } from '../public/js/core/color-circle-model.js';
+import { FIXED_COLORS } from '../public/js/resources/fixed-color-resources.js';
 import { createInitialState } from '../public/js/core/state.js';
 
 test('createCircleModel builds hueStep * chromaStep chips', () => {
   const state = createInitialState({ hueStep: 10, chromaStep: 3 });
   const model = createCircleModel(state);
   assert.equal(model.chips.length, 30);
+});
+
+test('fixed color resources expose expected color spaces and step counts', () => {
+  assert.deepEqual(Object.keys(FIXED_COLORS), ['munsell', 'rgb', 'rgb+', 'brightness']);
+  assert.equal(FIXED_COLORS.munsell.length, 10);
+  assert.equal(FIXED_COLORS.rgb.length, 10);
+  assert.equal(FIXED_COLORS['rgb+'].length, 10);
+  assert.equal(FIXED_COLORS.brightness.length, 10);
 });
 
 test('judgeColor returns a boolean for representative base/target chips', () => {
