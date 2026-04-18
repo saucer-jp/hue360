@@ -1,3 +1,5 @@
+import { converter, formatHex } from 'culori';
+
 const BRADFORD_MATRIX = Object.freeze([
   Object.freeze([0.8951, 0.2664, -0.1614]),
   Object.freeze([-0.7502, 1.7135, 0.0367]),
@@ -10,14 +12,9 @@ const BRADFORD_INVERSE = Object.freeze([
   Object.freeze([-0.0085287, 0.0400428, 0.9684867]),
 ]);
 
-const XYZ_TO_SRGB_MATRIX = Object.freeze([
-  Object.freeze([3.2406, -1.5372, -0.4986]),
-  Object.freeze([-0.9689, 1.8758, 0.0415]),
-  Object.freeze([0.0557, -0.204, 1.057]),
-]);
-
 const ILLUMINANT_C = Object.freeze({ x: 0.3101, y: 0.3162 });
 const D65 = Object.freeze({ x: 0.3127, y: 0.329 });
+const toRgbColor = converter('rgb');
 
 export const MUNSELL_NOTATIONS = Object.freeze([
   '5R 6/14',
@@ -120,27 +117,27 @@ export function adaptXyzIlluminantCToD65({ X, Y, Z }) {
 }
 
 export function xyzToSrgb({ X, Y, Z }) {
-  const [r, g, b] = multiplyMatrixVector(XYZ_TO_SRGB_MATRIX, [X, Y, Z]);
+  const rgb = toRgbColor({
+    mode: 'xyz65',
+    x: X,
+    y: Y,
+    z: Z,
+  });
 
   return {
-    r,
-    g,
-    b,
+    r: rgb?.r ?? 0,
+    g: rgb?.g ?? 0,
+    b: rgb?.b ?? 0,
   };
 }
 
-function encodeSrgbChannel(channel) {
-  const clipped = Math.max(0, Math.min(1, channel));
-  if (clipped <= 0.0031308) {
-    return 12.92 * clipped;
-  }
-
-  return 1.055 * clipped ** (1 / 2.4) - 0.055;
-}
-
 export function srgbToHex({ r, g, b }) {
-  const toHex = (value) => Math.round(encodeSrgbChannel(value) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  return formatHex({
+    mode: 'rgb',
+    r,
+    g,
+    b,
+  }).toLowerCase();
 }
 
 export function convertNotationToHex(notation, renotationLookup) {
