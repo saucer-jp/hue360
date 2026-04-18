@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createCircleModel, getBaseSelection, getHueInterpolation, judgeColor } from '../public/js/core/color-circle-model.js';
+import { hsbToWeb, oklchToWeb, webToHsb, webToOklch } from '../public/js/core/color-math.js';
 import { FIXED_COLORS } from '../public/js/resources/fixed-color-resources.js';
 import { createInitialState } from '../public/js/core/state.js';
 
@@ -31,6 +32,28 @@ test('rgb uses the 20 fixed anchors directly when hueStep is 20', () => {
   const firstRing = model.colorStatuses.slice(0, 20).map((chip) => chip.web.toLowerCase());
 
   assert.deepEqual(firstRing, FIXED_COLORS.rgb.map((color) => color.toLowerCase()));
+});
+
+test('rgb interpolates fixed anchors in HSB space for in-between hues', () => {
+  const state = createInitialState({ colorSpace: 'rgb', hueStep: 40, chromaStep: 3 });
+  const model = createCircleModel(state);
+  const interpolated = model.colorStatuses[1].web.toLowerCase();
+  const start = webToHsb(FIXED_COLORS.rgb[0]);
+  const end = webToHsb(FIXED_COLORS.rgb[1]);
+  const hueDiff = ((end.h - start.h + 540) % 360) - 180;
+  const expected = hsbToWeb({
+    h: (start.h + hueDiff * 0.5 + 360) % 360,
+    s: start.s + (end.s - start.s) * 0.5,
+    b: start.b + (end.b - start.b) * 0.5,
+  }).toLowerCase();
+  const oklchInterpolated = oklchToWeb({
+    l: (webToOklch(FIXED_COLORS.rgb[0]).l + webToOklch(FIXED_COLORS.rgb[1]).l) / 2,
+    c: (webToOklch(FIXED_COLORS.rgb[0]).c + webToOklch(FIXED_COLORS.rgb[1]).c) / 2,
+    h: (start.h + hueDiff * 0.5 + 360) % 360,
+  }).toLowerCase();
+
+  assert.equal(interpolated, expected);
+  assert.notEqual(interpolated, oklchInterpolated);
 });
 
 test('rgb+ uses the 20 fixed anchors directly when hueStep is 20', () => {
