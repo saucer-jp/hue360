@@ -1,4 +1,4 @@
-import { oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
+import { hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
 import { FIXED_COLORS } from '../resources/fixed-color-resources.js';
 
 const LAYOUT = {
@@ -97,6 +97,17 @@ function getBetweenColor(startColor, endColor, blend) {
   });
 }
 
+function getBetweenColorByHsb(startColor, endColor, blend) {
+  const start = webToHsb(startColor);
+  const end = webToHsb(endColor);
+
+  return hsbToWeb({
+    h: interpolateHue(start.h, end.h, blend),
+    s: start.s + (end.s - start.s) * blend,
+    b: start.b + (end.b - start.b) * blend,
+  });
+}
+
 function applyFlatBrightness(webColor, state) {
   const oklch = webToOklch(webColor);
   const range = (oklch.l - darkestBrightnessOklch.l) / FIXED_COLORS.brightness.length;
@@ -137,7 +148,15 @@ function applyBrightness(webColor, count, state) {
 
 function getWebColor(hueIndex, state, fixedColors, hueCount) {
   const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, hueCount, fixedColors.length);
-  let webColor = blend === 0 ? fixedColors[startIndex] : getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
+  let webColor;
+
+  if (blend === 0) {
+    webColor = fixedColors[startIndex];
+  } else if (state.colorSpace === 'rgb') {
+    webColor = getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend);
+  } else {
+    webColor = getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
+  }
 
   const count = {
     chroma: Math.floor(hueIndex / hueCount) + 1,
