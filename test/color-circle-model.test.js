@@ -14,8 +14,8 @@ test('createCircleModel builds hueStep * chromaStep chips', () => {
 test('fixed color resources expose expected color spaces and step counts', () => {
   assert.deepEqual(Object.keys(FIXED_COLORS), ['munsell', 'rgb', 'rgb+', 'brightness']);
   assert.equal(FIXED_COLORS.munsell.length, 20);
-  assert.equal(FIXED_COLORS.rgb.length, 10);
-  assert.equal(FIXED_COLORS['rgb+'].length, 10);
+  assert.equal(FIXED_COLORS.rgb.length, 20);
+  assert.equal(FIXED_COLORS['rgb+'].length, 20);
   assert.equal(FIXED_COLORS.brightness.length, 10);
 });
 
@@ -24,6 +24,20 @@ test('munsell uses the 20 fixed anchors directly when hueStep is 20', () => {
   const firstRing = model.colorStatuses.slice(0, 20).map((chip) => chip.web.toLowerCase());
 
   assert.deepEqual(firstRing, FIXED_COLORS.munsell.map((color) => color.toLowerCase()));
+});
+
+test('rgb uses the 20 fixed anchors directly when hueStep is 20', () => {
+  const model = createCircleModel(createInitialState({ colorSpace: 'rgb', hueStep: 20, chromaStep: 3 }));
+  const firstRing = model.colorStatuses.slice(0, 20).map((chip) => chip.web.toLowerCase());
+
+  assert.deepEqual(firstRing, FIXED_COLORS.rgb.map((color) => color.toLowerCase()));
+});
+
+test('rgb+ uses the 20 fixed anchors directly when hueStep is 20', () => {
+  const model = createCircleModel(createInitialState({ colorSpace: 'rgb+', hueStep: 20, chromaStep: 3 }));
+  const firstRing = model.colorStatuses.slice(0, 20).map((chip) => chip.web.toLowerCase());
+
+  assert.deepEqual(firstRing, FIXED_COLORS['rgb+'].map((color) => color.toLowerCase()));
 });
 
 test('judgeColor returns a boolean for representative base/target chips', () => {
