@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "start": "serve -s dist -l tcp://0.0.0.0:${PORT:-3000}",
+    "generate:munsell": "node scripts/generate-munsell-fixed-colors.js",
     "test": "node --test",
     "heroku-postbuild": "npm run build"
   },
