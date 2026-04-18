@@ -15,7 +15,7 @@ npm install
 ローカル起動:
 
 ```bash
-npm start
+npm run dev
 ```
 
 テスト実行:
@@ -24,9 +24,20 @@ npm start
 npm test
 ```
 
+本番ビルド確認:
+
+```bash
+npm run build
+```
+
+Vite は開発サーバーとビルドを担う基盤で、アプリ自体は引き続きシンプルなフロントエンド構成です。
+
 ## Deployment
 
 Heroku へデプロイする場合:
+
+- デプロイ時に `heroku-postbuild` で `npm run build` を実行し、`dist/` を生成します。
+- 起動時は `npm start` で `dist/` を静的配信します。
 
 ```bash
 git push heroku main
