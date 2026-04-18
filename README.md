@@ -53,3 +53,10 @@ git push heroku main
 
 - `v0.14.0`: 旧 Ruby / Sinatra ベースの基準版
 - `v1.0.0`: Node 化以降の現行統合版
+
+## Munsell Notation Source
+
+- `public/js/resources/fixed-color-resources.js` の `munsell` 配列に付けている notation コメントは、Munsell Color の notation 一覧を基準にしています。
+- 参照元:
+  - [Munsell Color - List of Colors by Notation Name](https://munsell.com/faqs/list-of-colors-by-notation-name/)
+- 配列中の `HEX` 値は上記 notation に対応するアプリ表示用の近似値であり、参照元が公式に提供する `sRGB` / `HEX` 値そのものではありません。
