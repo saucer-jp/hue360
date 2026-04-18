@@ -71,7 +71,7 @@ test('getHueInterpolation keeps blend within a single segment across full rotati
 test('same spoke keeps a stable hue family across chroma rings', () => {
   const model = createCircleModel(createInitialState({ colorSpace: 'munsell', hueStep: 20, chromaStep: 7 }));
   const spokeIndex = 0;
-  const spokeHues = Array.from({ length: 7 }, (_, ring) => model.colorStatuses[ring * 20 + spokeIndex].hsb.h);
+  const spokeHues = Array.from({ length: 7 }, (_, ring) => model.colorStatuses[ring * 20 + spokeIndex].oklch.h);
   const circularDiffs = spokeHues.slice(1).map((hue, index) => {
     const prev = spokeHues[index];
     const diff = Math.abs(hue - prev);
@@ -122,4 +122,34 @@ test('palest chroma ring keeps slight color instead of collapsing to pure white'
       `${colorSpace} palest ring still contains pure white: ${palestRing.map((chip) => chip.web).join(', ')}`
     );
   }
+});
+
+test('judgeColor uses OKLCH hue, chroma, and lightness ranges for rgb mode', () => {
+  const state = createInitialState({
+    colorSpace: 'rgb',
+    hueStep: 20,
+    chromaStep: 7,
+    baseColorId: 0,
+    baseColor: '#ff0000',
+    baseChromaIndex: 0,
+    judgeEnabled: true,
+  });
+  const baseAnalysis = {
+    kind: 'oklch',
+    base: { h: 0, c: 0.15, l: 0.5 },
+    brightnessStep: 10,
+    justNoticeableLightnessDiff: 10 / 255,
+  };
+  const colorStatuses = [
+    { id: 0, web: '#ff0000', oklch: baseAnalysis.base, stepNum: { hue: 1, chroma: 1, brightness: 0 } },
+    { id: 1, web: '#ff3300', oklch: { h: 20, c: 0.15, l: 0.5 }, stepNum: { hue: 2, chroma: 1, brightness: 0 } },
+    { id: 2, web: '#ff0000', oklch: { h: 0, c: 0.25, l: 0.5 }, stepNum: { hue: 1, chroma: 2, brightness: 0 } },
+    { id: 3, web: '#ff6666', oklch: { h: 0, c: 0.15, l: 0.54 }, stepNum: { hue: 1, chroma: 1, brightness: 0 } },
+    { id: 4, web: '#00ffff', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 10, chroma: 4, brightness: 0 } },
+  ];
+
+  assert.equal(judgeColor(colorStatuses, state, 1, baseAnalysis), false);
+  assert.equal(judgeColor(colorStatuses, state, 2, baseAnalysis), false);
+  assert.equal(judgeColor(colorStatuses, state, 3, baseAnalysis), false);
+  assert.equal(judgeColor(colorStatuses, state, 4, baseAnalysis), true);
 });
