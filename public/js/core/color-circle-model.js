@@ -1,22 +1,5 @@
 import { hsbToWeb, rgbToWeb, webToHsb, webToRgb } from './color-math.js';
-
-const FIXED_COLORS = {
-  munsell: [
-    '#C7243A',
-    '#EDAD0B',
-    '#FFE600',
-    '#A3C520',
-    '#009250',
-    '#0086AB',
-    '#0079B7',
-    '#5D639E',
-    '#932675',
-    '#B61971',
-  ],
-  rgb: ['#FF0000', '#FF9900', '#CCFF00', '#33FF00', '#00FF66', '#00FFFF', '#0066FF', '#3300FF', '#CC00FF', '#FF0099'],
-  'rgb+': ['#FF0022', '#FFA700', '#FFE600', '#CAFF00', '#00FF8C', '#00C8FF', '#00A9FF', '#0018FF', '#FF00BA', '#FF0055'],
-  brightness: ['#FFFFFF', '#E3E3E3', '#C6C6C6', '#AAAAAA', '#8E8E8E', '#717171', '#555555', '#393939', '#1C1C1C', '#000000'],
-};
+import { FIXED_COLORS } from '../resources/fixed-color-resources.js';
 
 const LAYOUT = {
   radius: 300,
