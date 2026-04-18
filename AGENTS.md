@@ -6,9 +6,9 @@
 ## Project Summary
 
 - このプロジェクトは色相環ベースの配色確認・調整用 Web アプリです。
-- 実装はシンプルな静的フロントエンド構成です。
+- 実装は Vite ベースのシンプルなフロントエンド構成です。
 - エントリポイントは `public/index.html` と `public/js/main.js` です。
-- ローカル起動は `npm start`、テストは `npm test` を使います。
+- ローカル起動は `npm run dev`、ビルド確認は `npm run build`、テストは `npm test` を使います。
 - `main` ブランチが公開バージョンです。
 
 ## Source Layout
@@ -18,6 +18,7 @@
 - `public/js/core/*`: 状態管理や色計算などの中核ロジック
 - `public/js/views/*`: DOM 描画や UI 更新
 - `public/js/utils/*`: 汎用ユーティリティ
+- `vite.config.js`: Vite のルートとビルド出力設定
 - `test/*.test.js`: Node 標準テストランナー用のテスト
 
 ## Working Rules
@@ -80,15 +81,17 @@
 - ビジネスロジックや計算処理は `public/js/core` に寄せること。
 - DOM 参照、イベント、表示更新は `public/js/views` や `public/js/utils/dom.js` 側に寄せること。
 - CSS は既存の `public/css/style.css` を中心に拡張し、場当たり的なインラインスタイル追加は避けること。
+- npm 依存は `import` で利用し、`public/js/lib` への手動同梱を新たに増やさないこと。
 - 変更前に同種の実装を検索し、重複ロジックを増やさないこと。
 - 将来の保守が難しくなる過度な抽象化は避けること。
 
 ## Validation
 
 - コード変更後は、まず `npm test` を実行して既存テストを確認すること。
+- 配信まわりの変更や依存更新を含む場合は `npm run build` も実行して、`dist` の生成成功を確認すること。
 - 振る舞い変更やバグ修正では、可能なら再現ケースに対応するテストを追加すること。
 - UI を変更した場合は、少なくとも関連する HTML/CSS/JS の整合を確認すること。
-- リリース前は、`main` に入る内容が意図したものかを確認したうえでリリースノートを更新すること。
+- リリース前は、`main` に入る内容が意図したものかと `dist` 配信前提の設定を確認したうえでリリースノートを更新すること。
 
 ## Safety
 

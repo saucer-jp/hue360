@@ -1,4 +1,4 @@
-import { converter, formatHex, toGamut } from '../lib/culori.min.mjs';
+import { converter, formatHex, toGamut } from 'culori';
 
 const toOklchColor = converter('oklch');
 const toRgbColor = converter('rgb');

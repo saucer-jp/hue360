@@ -4,11 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "serve -s public",
-    "test": "node --test"
+    "dev": "vite",
+    "build": "vite build",
+    "start": "serve -s dist -l tcp://0.0.0.0:${PORT:-3000}",
+    "test": "node --test",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "culori": "^4.0.2",
     "serve": "^14.2.4"
+  },
+  "devDependencies": {
+    "vite": "^8.0.8"
   }
 }
