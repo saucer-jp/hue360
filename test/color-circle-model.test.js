@@ -168,7 +168,7 @@ test('palest chroma ring keeps slight color instead of collapsing to pure white'
   }
 });
 
-test('judgeColor uses OKLCH hue, chroma, and lightness ranges for rgb mode', () => {
+test('judgeColor uses step-based hue, chroma, and brightness ranges for rgb mode', () => {
   const state = createInitialState({
     colorSpace: 'rgb',
     hueStep: 20,
@@ -176,24 +176,75 @@ test('judgeColor uses OKLCH hue, chroma, and lightness ranges for rgb mode', () 
     baseColorId: 0,
     baseColor: '#ff0000',
     baseChromaIndex: 0,
+    baseColorBrightness: 0,
     judgeEnabled: true,
   });
   const baseAnalysis = {
-    kind: 'oklch',
-    base: { h: 0, c: 0.15, l: 0.5 },
+    kind: 'step',
+    base: { stepHue: 1, stepChroma: 1, stepBrightness: 0 },
     brightnessStep: 10,
-    justNoticeableLightnessDiff: 10 / 255,
+    justNoticeableBrightnessDiff: 0.1,
   };
   const colorStatuses = [
-    { id: 0, web: '#ff0000', oklch: baseAnalysis.base, stepNum: { hue: 1, chroma: 1, brightness: 0 } },
-    { id: 1, web: '#ff3300', oklch: { h: 20, c: 0.15, l: 0.5 }, stepNum: { hue: 2, chroma: 1, brightness: 0 } },
-    { id: 2, web: '#ff0000', oklch: { h: 0, c: 0.25, l: 0.5 }, stepNum: { hue: 1, chroma: 2, brightness: 0 } },
-    { id: 3, web: '#ff6666', oklch: { h: 0, c: 0.15, l: 0.54 }, stepNum: { hue: 1, chroma: 1, brightness: 0 } },
-    { id: 4, web: '#00ffff', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 10, chroma: 4, brightness: 0 } },
+    { id: 0, web: '#ff0000', oklch: { h: 0, c: 0.15, l: 0.5 }, stepNum: { hue: 1, chroma: 1, brightness: 0 } },
+    { id: 1, web: '#ff3300', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 2, chroma: 1, brightness: 0 } },
+    { id: 2, web: '#ff0000', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 1, chroma: 2, brightness: 0 } },
+    { id: 3, web: '#ff6666', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 1, chroma: 1, brightness: 2 } },
+    { id: 4, web: '#00ffff', oklch: { h: 150, c: 0.35, l: 0.62 }, stepNum: { hue: 10, chroma: 7, brightness: 0 } },
   ];
 
   assert.equal(judgeColor(colorStatuses, state, 1, baseAnalysis), false);
   assert.equal(judgeColor(colorStatuses, state, 2, baseAnalysis), false);
   assert.equal(judgeColor(colorStatuses, state, 3, baseAnalysis), false);
   assert.equal(judgeColor(colorStatuses, state, 4, baseAnalysis), true);
+});
+
+test('rgb keeps all chips visible when judgeEnabled is false', () => {
+  const state = createInitialState({
+    colorSpace: 'rgb',
+    hueStep: 20,
+    chromaStep: 7,
+    baseColorId: 3,
+    baseColor: FIXED_COLORS.rgb[3],
+    baseHueAngle: (360 / 20) * 3,
+    baseChromaIndex: 0,
+    baseColorBrightness: 0,
+    judgeEnabled: false,
+  });
+  const model = createCircleModel(state);
+
+  assert.equal(model.chips.every((chip) => chip.isClashing === false), true);
+});
+
+test('rgb judge-visible distribution matches rgb+ under the same step-based selection', () => {
+  const sharedSelection = {
+    hueStep: 20,
+    chromaStep: 7,
+    baseColorId: 7,
+    baseHueAngle: (360 / 20) * 7,
+    baseChromaIndex: 0,
+    baseColorBrightness: 0,
+    judgeEnabled: true,
+  };
+  const rgbModel = createCircleModel(
+    createInitialState({
+      ...sharedSelection,
+      colorSpace: 'rgb',
+      baseColor: FIXED_COLORS.rgb[7],
+    })
+  );
+  const rgbPlusModel = createCircleModel(
+    createInitialState({
+      ...sharedSelection,
+      colorSpace: 'rgb+',
+      baseColor: FIXED_COLORS['rgb+'][7],
+    })
+  );
+  const countVisibleByRing = (model) =>
+    Array.from({ length: sharedSelection.chromaStep }, (_, ring) =>
+      model.chips.slice(ring * sharedSelection.hueStep, (ring + 1) * sharedSelection.hueStep).filter((chip) => !chip.isClashing)
+        .length
+    );
+
+  assert.deepEqual(countVisibleByRing(rgbModel), countVisibleByRing(rgbPlusModel));
 });

@@ -229,7 +229,7 @@ function createBaseAnalysis(colorStatuses, state) {
     return null;
   }
 
-  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb+') {
+  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb' || state.colorSpace === 'rgb+') {
     return {
       kind: 'step',
       base: {
