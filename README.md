@@ -59,4 +59,15 @@ git push heroku main
 - `public/js/resources/fixed-color-resources.js` の `munsell` 配列に付けている notation コメントは、Munsell Color の notation 一覧を基準にしています。
 - 参照元:
   - [Munsell Color - List of Colors by Notation Name](https://munsell.com/faqs/list-of-colors-by-notation-name/)
-- 配列中の `HEX` 値は上記 notation に対応するアプリ表示用の近似値であり、参照元が公式に提供する `sRGB` / `HEX` 値そのものではありません。
+- `munsell` 配列の `HEX` 値は、Munsell が公式に配布している `sRGB` / `HEX` 値ではありません。
+- このアプリでは、notation を起点に RIT Munsell Color Science Lab の renotation data (`scripts/data/munsell-renotation-real.dat`) から `CIE x y Y` を引き、`XYZ` へ変換したうえで illuminant C から D65 へ Bradford 順応し、最後に `sRGB` / `HEX` へ変換した結果を固定値として採用しています。
+- 参照元:
+  - [RIT Munsell Renotation Data](https://www.rit-mcsl.org/MunsellRenotation/)
+- `HEX` 値は上記変換結果をそのままアプリの代表色として固定したもので、ランタイムでは notation から再計算していません。
+- 再生成が必要な場合は次を実行します。
+
+```bash
+npm run generate:munsell
+```
+
+- 変換ロジックは `public/js/core/munsell-renotation.js`、固定リソース更新スクリプトは `scripts/generate-munsell-fixed-colors.js` にあります。
