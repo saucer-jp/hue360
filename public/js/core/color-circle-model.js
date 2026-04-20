@@ -250,16 +250,13 @@ function createBaseAnalysis(colorStatuses, state) {
   };
 }
 
-export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
-  const { selectedChipId } = getBaseSelection(state);
-  if (selectedChipId == null || !state.judgeEnabled) {
+function judgeTargetStatus(state, targetStatus, baseAnalysis = null) {
+  if (!targetStatus) {
     return true;
   }
 
-  const targetStatus = colorStatuses[id];
-  const analysis = baseAnalysis ?? createBaseAnalysis(colorStatuses, state);
-
-  if (!targetStatus || !analysis) {
+  const analysis = baseAnalysis;
+  if (!state.judgeEnabled || !analysis) {
     return true;
   }
 
@@ -313,6 +310,44 @@ export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
   return true;
 }
 
+export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
+  const { selectedChipId } = getBaseSelection(state);
+  if (selectedChipId == null || !state.judgeEnabled) {
+    return true;
+  }
+
+  const targetStatus = colorStatuses[id];
+  const analysis = baseAnalysis ?? createBaseAnalysis(colorStatuses, state);
+  return judgeTargetStatus(state, targetStatus, analysis);
+}
+
+function createBrightnessChips(state, selectedChipId, baseAnalysis) {
+  if (selectedChipId == null || !state.judgeEnabled || !baseAnalysis) {
+    return FIXED_COLORS.brightness.map((color, brightness) => ({
+      brightness,
+      color,
+      isCurrent: brightness === state.brightness,
+      isClashing: false,
+    }));
+  }
+
+  return FIXED_COLORS.brightness.map((color, brightness) => {
+    const brightnessState = {
+      ...state,
+      brightness,
+    };
+    const brightnessStatuses = createColorStatuses(brightnessState);
+    const targetStatus = brightnessStatuses[selectedChipId];
+
+    return {
+      brightness,
+      color,
+      isCurrent: brightness === state.brightness,
+      isClashing: !judgeTargetStatus(state, targetStatus, baseAnalysis),
+    };
+  });
+}
+
 function createStaticKey(state) {
   return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness].join(':');
 }
@@ -355,6 +390,7 @@ export function createCircleModel(state) {
   });
 
   return {
+    brightnessChips: createBrightnessChips(state, selectedChipId, baseAnalysis),
     chips,
     colorStatuses,
     layout: LAYOUT,

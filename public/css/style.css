@@ -331,6 +331,11 @@ body {
   box-shadow: 0 0 6px var(--accent-color);
 }
 
+#brightness .brightness-clash {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #print {
   position: fixed;
   z-index: 500;
