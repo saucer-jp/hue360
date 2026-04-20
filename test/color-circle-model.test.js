@@ -10,6 +10,7 @@ test('createCircleModel builds hueStep * chromaStep chips', () => {
   const state = createInitialState({ hueStep: 10, chromaStep: 3 });
   const model = createCircleModel(state);
   assert.equal(model.chips.length, 30);
+  assert.equal(model.brightnessChips.length, 10);
 });
 
 test('fixed color resources expose expected color spaces and step counts', () => {
@@ -214,6 +215,35 @@ test('rgb keeps all chips visible when judgeEnabled is false', () => {
   const model = createCircleModel(state);
 
   assert.equal(model.chips.every((chip) => chip.isClashing === false), true);
+  assert.equal(model.brightnessChips.every((chip) => chip.isClashing === false), true);
+});
+
+test('brightness chips stay visible when no base color is selected', () => {
+  const model = createCircleModel(createInitialState({ colorSpace: 'rgb', hueStep: 20, chromaStep: 7 }));
+
+  assert.equal(model.brightnessChips.every((chip) => chip.isClashing === false), true);
+});
+
+test('brightness chips use judge results for each brightness candidate', () => {
+  const state = createInitialState({
+    colorSpace: 'rgb',
+    hueStep: 20,
+    chromaStep: 7,
+    brightness: 2,
+    baseColorId: 0,
+    baseColor: FIXED_COLORS.rgb[0],
+    baseHueAngle: 0,
+    baseChromaIndex: 0,
+    baseColorBrightness: 0,
+    judgeEnabled: true,
+  });
+  const model = createCircleModel(state);
+  const currentChip = model.brightnessChips.find((chip) => chip.isCurrent);
+
+  assert.equal(currentChip?.brightness, 2);
+  assert.equal(currentChip?.isClashing, true);
+  assert.equal(model.brightnessChips.some((chip) => chip.isClashing), true);
+  assert.equal(model.brightnessChips.some((chip) => !chip.isClashing), true);
 });
 
 test('rgb judge-visible distribution matches rgb+ under the same step-based selection', () => {

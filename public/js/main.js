@@ -60,12 +60,17 @@ function renderBodySection() {
   nodes.body.style.backgroundColor = appState.backgroundColor;
 }
 
-function renderControllerSection() {
-  renderController(appState, nodes.controller);
+function renderControllerSection(circleModel = createCircleModel(appState)) {
+  renderController(appState, circleModel.brightnessChips, nodes.controller);
 }
 
-function renderCircleSection() {
-  renderCircle(createCircleModel(appState));
+function renderCircleSection(circleModel = createCircleModel(appState)) {
+  renderCircle(circleModel);
+}
+
+function renderCircleAndControllerSections(circleModel = createCircleModel(appState)) {
+  renderControllerSection(circleModel);
+  renderCircleSection(circleModel);
 }
 
 function renderUserColorSection() {
@@ -74,8 +79,7 @@ function renderUserColorSection() {
 
 function renderApp() {
   renderBodySection();
-  renderControllerSection();
-  renderCircleSection();
+  renderCircleAndControllerSections();
   renderUserColorSection();
 }
 
@@ -88,8 +92,7 @@ function applyControllerValue(setting, value) {
   }
 
   appState = nextState;
-  renderControllerSection();
-  renderCircleSection();
+  renderCircleAndControllerSections();
 }
 
 function handleControllerInput(event) {
@@ -115,8 +118,7 @@ delegate(nodes.brightness, 'click', '.chip', (event, chip) => {
   }
 
   appState = syncBaseColor(setBrightness(appState, Number(chip.dataset.brightness)));
-  renderControllerSection();
-  renderCircleSection();
+  renderCircleAndControllerSections();
 });
 
 delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
@@ -140,7 +142,7 @@ delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
       chromaIndex: Math.floor(chipId / appState.hueStep),
       brightness: appState.brightness,
     });
-    renderCircleSection();
+    renderCircleAndControllerSections();
     renderUserColorSection();
     return;
   }
@@ -157,7 +159,7 @@ delegate(nodes.userColor, 'click', '[data-action]', (_, actionNode) => {
       return;
     case 'clear-all':
       appState = clearSelection(appState);
-      renderCircleSection();
+      renderCircleAndControllerSections();
       renderUserColorSection();
       return;
     case 'remove-sub-color':

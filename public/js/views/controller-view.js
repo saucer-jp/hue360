@@ -1,6 +1,6 @@
 import { qsa } from '../utils/dom.js';
 
-export function renderController(state, root) {
+export function renderController(state, brightnessChips, root) {
   qsa('[data-setting]', root).forEach((input) => {
     const key = input.dataset.setting;
     if (key === 'judgeEnabled') {
@@ -16,6 +16,9 @@ export function renderController(state, root) {
   });
 
   qsa('#brightness .chip', root.ownerDocument).forEach((chip) => {
-    chip.classList.toggle('current-brightness', Number(chip.dataset.brightness) === state.brightness);
+    const brightness = Number(chip.dataset.brightness);
+    const brightnessChip = brightnessChips.find((candidate) => candidate.brightness === brightness);
+    chip.classList.toggle('current-brightness', brightnessChip?.isCurrent ?? false);
+    chip.classList.toggle('brightness-clash', brightnessChip?.isClashing ?? false);
   });
 }
