@@ -9,6 +9,7 @@ import {
   setBaseColor,
   setBrightness,
   setPrintVisible,
+  syncBaseColorSelection,
   updateSetting,
 } from './core/state.js';
 import { normalizeCssColor } from './utils/color-format.js';
@@ -44,16 +45,7 @@ function syncBaseColor(state) {
   const circleModel = createCircleModel(state);
   const selectedChipId = circleModel.selectedChipId;
   const selectedStatus = selectedChipId == null ? null : circleModel.colorStatuses[selectedChipId];
-  if (!selectedStatus) {
-    return state;
-  }
-
-  return {
-    ...state,
-    baseColorId: selectedChipId,
-    baseColor: selectedStatus.web,
-    baseChromaIndex: Math.floor(selectedChipId / state.hueStep),
-  };
+  return syncBaseColorSelection(state, selectedStatus);
 }
 
 function renderBodySection() {
@@ -117,7 +109,13 @@ delegate(nodes.brightness, 'click', '.chip', (event, chip) => {
     return;
   }
 
-  appState = syncBaseColor(setBrightness(appState, Number(chip.dataset.brightness)));
+  appState = syncBaseColorSelection(
+    setBrightness(appState, Number(chip.dataset.brightness)),
+    appState.baseColor
+      ? { id: appState.baseColorId, web: appState.baseColor }
+      : null,
+    { preserveCommittedColor: true },
+  );
   renderCircleAndControllerSections();
 });
 

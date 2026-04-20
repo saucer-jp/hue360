@@ -31,6 +31,19 @@ export function setBrightness(state, brightness) {
   };
 }
 
+export function syncBaseColorSelection(state, selectedStatus, { preserveCommittedColor = false } = {}) {
+  if (!selectedStatus) {
+    return state;
+  }
+
+  return {
+    ...state,
+    baseColorId: selectedStatus.id,
+    baseColor: preserveCommittedColor ? state.baseColor : selectedStatus.web,
+    baseChromaIndex: Math.floor(selectedStatus.id / state.hueStep),
+  };
+}
+
 export function setBaseColor(state, payload) {
   return {
     ...state,

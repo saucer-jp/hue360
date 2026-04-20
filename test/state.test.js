@@ -10,6 +10,7 @@ import {
   setBackgroundColor,
   setBaseColor,
   setPrintVisible,
+  syncBaseColorSelection,
 } from '../public/js/core/state.js';
 
 test('setBaseColor resets selection state for a new base color', () => {
@@ -63,4 +64,28 @@ test('clearSelection preserves unrelated state while clearing chosen colors', ()
   assert.equal(state.baseChromaIndex, null);
   assert.deepEqual(state.selectedColors, []);
   assert.equal(state.printVisible, false);
+});
+
+test('syncBaseColorSelection can preserve the committed base color across brightness changes', () => {
+  const initial = createInitialState({
+    hueStep: 20,
+    baseColor: '#abcdef',
+    baseColorId: 4,
+    baseChromaIndex: 0,
+    baseColorBrightness: 0,
+    brightness: 3,
+  });
+  const next = syncBaseColorSelection(
+    initial,
+    {
+      id: 4,
+      web: '#778899',
+    },
+    { preserveCommittedColor: true },
+  );
+
+  assert.equal(next.baseColor, '#abcdef');
+  assert.equal(next.baseColorId, 4);
+  assert.equal(next.baseChromaIndex, 0);
+  assert.equal(next.brightness, 3);
 });
