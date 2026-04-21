@@ -1,3 +1,14 @@
+import { converter, formatHex, toGamut } from 'culori';
+
+const toOklchColor = converter('oklch');
+const toRgbColor = converter('rgb');
+const clampToRgb = toGamut('rgb', 'oklch', null);
+const RGB_EPSILON = 0.000001;
+
+function normalizeHue(hue) {
+  return ((hue ?? 0) % 360 + 360) % 360;
+}
+
 export function webToRgb(web) {
   const normalized = web.startsWith('#') ? web.slice(1) : web;
 
@@ -19,6 +30,41 @@ export function webToRgb(web) {
 export function rgbToWeb(rgb) {
   const toHex = (value) => Math.round(value).toString(16).padStart(2, '0');
   return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+export function webToOklch(web) {
+  const color = toOklchColor(web);
+  if (!color) {
+    return { l: 0, c: 0, h: 0 };
+  }
+
+  return {
+    l: color.l ?? 0,
+    c: color.c ?? 0,
+    h: normalizeHue(color.h),
+  };
+}
+
+export function oklchToWeb(oklch) {
+  const color = {
+    mode: 'oklch',
+    l: Math.max(0, Math.min(1, oklch.l ?? 0)),
+    c: Math.max(0, oklch.c ?? 0),
+    h: normalizeHue(oklch.h),
+    alpha: oklch.alpha,
+  };
+  const rgb = toRgbColor(color);
+  const shouldPreserveRgb =
+    rgb &&
+    rgb.r >= -RGB_EPSILON &&
+    rgb.r <= 1 + RGB_EPSILON &&
+    rgb.g >= -RGB_EPSILON &&
+    rgb.g <= 1 + RGB_EPSILON &&
+    rgb.b >= -RGB_EPSILON &&
+    rgb.b <= 1 + RGB_EPSILON;
+  const output = shouldPreserveRgb ? rgb : clampToRgb(color);
+
+  return formatHex(output).toLowerCase();
 }
 
 export function webToHsb(web) {

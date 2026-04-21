@@ -9,6 +9,7 @@ import {
   setBaseColor,
   setBrightness,
   setPrintVisible,
+  syncBaseColorSelection,
   updateSetting,
 } from './core/state.js';
 import { normalizeCssColor } from './utils/color-format.js';
@@ -44,28 +45,24 @@ function syncBaseColor(state) {
   const circleModel = createCircleModel(state);
   const selectedChipId = circleModel.selectedChipId;
   const selectedStatus = selectedChipId == null ? null : circleModel.colorStatuses[selectedChipId];
-  if (!selectedStatus) {
-    return state;
-  }
-
-  return {
-    ...state,
-    baseColorId: selectedChipId,
-    baseColor: selectedStatus.web,
-    baseChromaIndex: Math.floor(selectedChipId / state.hueStep),
-  };
+  return syncBaseColorSelection(state, selectedStatus);
 }
 
 function renderBodySection() {
   nodes.body.style.backgroundColor = appState.backgroundColor;
 }
 
-function renderControllerSection() {
-  renderController(appState, nodes.controller);
+function renderControllerSection(circleModel = createCircleModel(appState)) {
+  renderController(appState, circleModel.brightnessChips, nodes.controller);
 }
 
-function renderCircleSection() {
-  renderCircle(createCircleModel(appState));
+function renderCircleSection(circleModel = createCircleModel(appState)) {
+  renderCircle(circleModel);
+}
+
+function renderCircleAndControllerSections(circleModel = createCircleModel(appState)) {
+  renderControllerSection(circleModel);
+  renderCircleSection(circleModel);
 }
 
 function renderUserColorSection() {
@@ -74,8 +71,7 @@ function renderUserColorSection() {
 
 function renderApp() {
   renderBodySection();
-  renderControllerSection();
-  renderCircleSection();
+  renderCircleAndControllerSections();
   renderUserColorSection();
 }
 
@@ -88,8 +84,7 @@ function applyControllerValue(setting, value) {
   }
 
   appState = nextState;
-  renderControllerSection();
-  renderCircleSection();
+  renderCircleAndControllerSections();
 }
 
 function handleControllerInput(event) {
@@ -114,9 +109,14 @@ delegate(nodes.brightness, 'click', '.chip', (event, chip) => {
     return;
   }
 
-  appState = syncBaseColor(setBrightness(appState, Number(chip.dataset.brightness)));
-  renderControllerSection();
-  renderCircleSection();
+  appState = syncBaseColorSelection(
+    setBrightness(appState, Number(chip.dataset.brightness)),
+    appState.baseColor
+      ? { id: appState.baseColorId, web: appState.baseColor }
+      : null,
+    { preserveCommittedColor: true },
+  );
+  renderCircleAndControllerSections();
 });
 
 delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
@@ -140,7 +140,7 @@ delegate(nodes.colorCircle, 'click', '.circle .chip', (event, chip) => {
       chromaIndex: Math.floor(chipId / appState.hueStep),
       brightness: appState.brightness,
     });
-    renderCircleSection();
+    renderCircleAndControllerSections();
     renderUserColorSection();
     return;
   }
@@ -157,7 +157,7 @@ delegate(nodes.userColor, 'click', '[data-action]', (_, actionNode) => {
       return;
     case 'clear-all':
       appState = clearSelection(appState);
-      renderCircleSection();
+      renderCircleAndControllerSections();
       renderUserColorSection();
       return;
     case 'remove-sub-color':

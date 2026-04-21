@@ -1,22 +1,5 @@
-import { hsbToWeb, rgbToWeb, webToHsb, webToRgb } from './color-math.js';
-
-const FIXED_COLORS = {
-  munsell: [
-    '#C7243A',
-    '#EDAD0B',
-    '#FFE600',
-    '#A3C520',
-    '#009250',
-    '#0086AB',
-    '#0079B7',
-    '#5D639E',
-    '#932675',
-    '#B61971',
-  ],
-  rgb: ['#FF0000', '#FF9900', '#CCFF00', '#33FF00', '#00FF66', '#00FFFF', '#0066FF', '#3300FF', '#CC00FF', '#FF0099'],
-  'rgb+': ['#FF0022', '#FFA700', '#FFE600', '#CAFF00', '#00FF8C', '#00C8FF', '#00A9FF', '#0018FF', '#FF00BA', '#FF0055'],
-  brightness: ['#FFFFFF', '#E3E3E3', '#C6C6C6', '#AAAAAA', '#8E8E8E', '#717171', '#555555', '#393939', '#1C1C1C', '#000000'],
-};
+import { hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
+import { FIXED_COLORS } from '../resources/fixed-color-resources.js';
 
 const LAYOUT = {
   radius: 300,
@@ -27,12 +10,31 @@ const LAYOUT = {
 };
 
 const staticCircleCache = new Map();
-const darkestBrightnessHsb = webToHsb(FIXED_COLORS.brightness.at(-1));
-const CHROMA_MIN_SATURATION_RATIO = 0.12;
-const CHROMA_BRIGHTNESS_HEADROOM = 8;
+const brightnessLevels = FIXED_COLORS.brightness.map(webToOklch);
+const darkestBrightnessOklch = brightnessLevels.at(-1);
+const CHROMA_MIN_RATIO = 0.12;
+const LIGHTNESS_HEADROOM = 8 / 255;
+const OKLCH_MAX_CHROMA = 0.4;
+const LIGHTNESS_SCALE = 10;
 
 function normalizeHueIndex(index, hueStep) {
   return ((index % hueStep) + hueStep) % hueStep;
+}
+
+function normalizeHueAngle(hue) {
+  return ((hue ?? 0) % 360 + 360) % 360;
+}
+
+function getCircularHueDiff(startHue, endHue) {
+  const diff = Math.abs(normalizeHueAngle(startHue) - normalizeHueAngle(endHue));
+  return Math.min(diff, 360 - diff);
+}
+
+function interpolateHue(startHue, endHue, blend) {
+  const normalizedStart = normalizeHueAngle(startHue);
+  const normalizedEnd = normalizeHueAngle(endHue);
+  const diff = ((normalizedEnd - normalizedStart + 540) % 360) - 180;
+  return normalizeHueAngle(normalizedStart + diff * blend);
 }
 
 export function getBaseSelection(state) {
@@ -85,91 +87,76 @@ export function getHueInterpolation(hueIndex, hueCount, colorCount) {
 }
 
 function getBetweenColor(startColor, endColor, blend) {
+  const start = webToOklch(startColor);
+  const end = webToOklch(endColor);
+
+  return oklchToWeb({
+    l: start.l + (end.l - start.l) * blend,
+    c: start.c + (end.c - start.c) * blend,
+    h: interpolateHue(start.h, end.h, blend),
+  });
+}
+
+function getBetweenColorByHsb(startColor, endColor, blend) {
   const start = webToHsb(startColor);
   const end = webToHsb(endColor);
-  const max = {
-    h: Math.max(start.h, end.h),
-    s: Math.max(start.s, end.s),
-    b: Math.max(start.b, end.b),
-  };
-  const min = {
-    h: Math.min(start.h, end.h),
-    s: Math.min(start.s, end.s),
-    b: Math.min(start.b, end.b),
-  };
-  const range = { h: 0, s: 0, b: 0 };
-  const hsb = { h: 0, s: 0, b: 0 };
 
-  if (max.h - min.h > 180) {
-    const wrappedHue = 360 - max.h;
-    range.h = (wrappedHue + min.h) * blend;
-    if (max.h === start.h) {
-      hsb.h = start.h + range.h;
-      if (hsb.h >= 360) {
-        hsb.h -= 360;
-      }
-    }
-  } else {
-    range.h = (max.h - min.h) * blend;
-    if (max.h === start.h) {
-      hsb.h = start.h - range.h;
-    }
-  }
-
-  if (max.h === end.h) {
-    hsb.h = start.h + range.h;
-  }
-
-  range.s = (max.s - min.s) * blend;
-  hsb.s = max.s === start.s ? start.s - range.s : start.s + range.s;
-
-  range.b = (max.b - min.b) * blend;
-  hsb.b = max.b === start.b ? start.b - range.b : start.b + range.b;
-
-  return hsbToWeb(hsb);
+  return hsbToWeb({
+    h: interpolateHue(start.h, end.h, blend),
+    s: start.s + (end.s - start.s) * blend,
+    b: start.b + (end.b - start.b) * blend,
+  });
 }
 
 function applyFlatBrightness(webColor, state) {
-  const hsb = webToHsb(webColor);
-  const range = (hsb.b - darkestBrightnessHsb.b) / FIXED_COLORS.brightness.length;
-  hsb.b -= range * state.brightness;
-  return hsbToWeb(hsb);
+  const oklch = webToOklch(webColor);
+  const range = (oklch.l - darkestBrightnessOklch.l) / FIXED_COLORS.brightness.length;
+  oklch.l = Math.max(0, oklch.l - range * state.brightness);
+  return oklchToWeb(oklch);
 }
 
 function applyChroma(webColor, count, state) {
-  const hsb = webToHsb(webColor);
-  const originalSaturation = hsb.s;
-  const range = hsb.s / (state.chromaStep - 1);
+  const oklch = webToOklch(webColor);
+  const originalChroma = oklch.c;
+  const range = oklch.c / (state.chromaStep - 1);
   const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const minimumSaturation = Math.round(originalSaturation * CHROMA_MIN_SATURATION_RATIO * chromaProgress);
-  hsb.s = Math.max(minimumSaturation, hsb.s - range * (count.chroma - 1));
-  return hsbToWeb(hsb);
+  const minimumChroma = originalChroma * CHROMA_MIN_RATIO * chromaProgress;
+  oklch.c = Math.max(minimumChroma, oklch.c - range * (count.chroma - 1));
+  return oklchToWeb(oklch);
 }
 
 function applyBrightness(webColor, count, state) {
-  const hsb = webToHsb(webColor);
-  const endColor = webToHsb(FIXED_COLORS.brightness[state.brightness]);
-  const max = Math.max(hsb.b, endColor.b);
-  const min = Math.min(hsb.b, endColor.b);
+  const oklch = webToOklch(webColor);
+  const endColor = brightnessLevels[state.brightness];
+  const max = Math.max(oklch.l, endColor.l);
+  const min = Math.min(oklch.l, endColor.l);
   const range = (max - min) / (state.chromaStep - 1);
   const offset = range * (count.chroma - 1);
 
-  if (max === hsb.b) {
-    hsb.b -= offset;
+  if (max === oklch.l) {
+    oklch.l -= offset;
   } else {
-    hsb.b += offset;
+    oklch.l += offset;
   }
 
   const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const maxBrightness = 255 - Math.round(CHROMA_BRIGHTNESS_HEADROOM * chromaProgress);
-  hsb.b = Math.min(hsb.b, maxBrightness);
+  const maxLightness = 1 - LIGHTNESS_HEADROOM * chromaProgress;
+  oklch.l = Math.min(oklch.l, maxLightness);
 
-  return hsbToWeb(hsb);
+  return oklchToWeb(oklch);
 }
 
 function getWebColor(hueIndex, state, fixedColors, hueCount) {
   const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, hueCount, fixedColors.length);
-  let webColor = blend === 0 ? fixedColors[startIndex] : getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
+  let webColor;
+
+  if (blend === 0) {
+    webColor = fixedColors[startIndex];
+  } else if (state.colorSpace === 'rgb') {
+    webColor = getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend);
+  } else {
+    webColor = getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
+  }
 
   const count = {
     chroma: Math.floor(hueIndex / hueCount) + 1,
@@ -194,6 +181,7 @@ export function createColorStatuses(state) {
       web,
       rgb: webToRgb(web),
       hsb: webToHsb(web),
+      oklch: webToOklch(web),
       stepNum: {
         hue: hueIndex + 1,
         chroma: chromaIndex + 1,
@@ -241,7 +229,7 @@ function createBaseAnalysis(colorStatuses, state) {
     return null;
   }
 
-  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb+') {
+  if (state.colorSpace === 'munsell' || state.colorSpace === 'rgb' || state.colorSpace === 'rgb+') {
     return {
       kind: 'step',
       base: {
@@ -255,29 +243,26 @@ function createBaseAnalysis(colorStatuses, state) {
   }
 
   return {
-    kind: 'hsb',
-    base: webToHsb(state.baseColor),
+    kind: 'oklch',
+    base: baseStatus.oklch,
     brightnessStep,
-    justNoticeableBrightnessDiff: brightnessStep / 255,
+    justNoticeableLightnessDiff: brightnessStep / 255,
   };
 }
 
-export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
-  const { selectedChipId } = getBaseSelection(state);
-  if (selectedChipId == null || !state.judgeEnabled) {
+function judgeTargetStatus(state, targetStatus, baseAnalysis = null) {
+  if (!targetStatus) {
     return true;
   }
 
-  const targetStatus = colorStatuses[id];
-  const analysis = baseAnalysis ?? createBaseAnalysis(colorStatuses, state);
-
-  if (!targetStatus || !analysis) {
+  const analysis = baseAnalysis;
+  if (!state.judgeEnabled || !analysis) {
     return true;
   }
 
   let H;
-  let S;
-  let B;
+  let C;
+  let L;
 
   if (analysis.kind === 'step') {
     const base = {
@@ -299,36 +284,68 @@ export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
     const minB = (Math.min(base.b, target.b) * 10) / analysis.brightnessStep;
 
     H = maxH - minH > 180 ? 360 - maxH + minH : maxH - minH;
-    S = maxS - minS;
-    B = maxB - minB;
+    C = maxS - minS;
+    L = maxB - minB;
   } else {
     const base = analysis.base;
-    const target = webToHsb(targetStatus.web);
-    const maxH = Math.max(base.h, target.h);
-    const minH = Math.min(base.h, target.h);
-    const maxS = Math.max(base.s, target.s);
-    const minS = Math.min(base.s, target.s);
-    const maxB = Math.max(base.b, target.b);
-    const minB = Math.min(base.b, target.b);
+    const target = targetStatus.oklch;
 
-    H = maxH - minH > 180 ? 360 - maxH + minH : maxH - minH;
-    S = (state.chromaStep * (maxS - minS)) / 255;
-    B = (analysis.brightnessStep * (maxB - minB)) / 255;
+    H = getCircularHueDiff(base.h, target.h);
+    C = (state.chromaStep * Math.abs(base.c - target.c)) / OKLCH_MAX_CHROMA;
+    L = LIGHTNESS_SCALE * Math.abs(base.l - target.l);
   }
 
   if ((H > 1 && H <= 25) || (H > 43 && H <= 100)) {
     return false;
   }
 
-  if ((S > 1 && S <= 3) || (S > 5 && S <= 7)) {
+  if ((C > 1 && C <= 3) || (C > 5 && C <= 7)) {
     return false;
   }
 
-  if ((B > analysis.justNoticeableBrightnessDiff && B <= 0.5) || (B > 1.5 && B <= 2.5)) {
+  if ((L > analysis.justNoticeableLightnessDiff && L <= 0.5) || (L > 1.5 && L <= 2.5)) {
     return false;
   }
 
   return true;
+}
+
+export function judgeColor(colorStatuses, state, id, baseAnalysis = null) {
+  const { selectedChipId } = getBaseSelection(state);
+  if (selectedChipId == null || !state.judgeEnabled) {
+    return true;
+  }
+
+  const targetStatus = colorStatuses[id];
+  const analysis = baseAnalysis ?? createBaseAnalysis(colorStatuses, state);
+  return judgeTargetStatus(state, targetStatus, analysis);
+}
+
+function createBrightnessChips(state, selectedChipId, baseAnalysis) {
+  if (selectedChipId == null || !state.judgeEnabled || !baseAnalysis) {
+    return FIXED_COLORS.brightness.map((color, brightness) => ({
+      brightness,
+      color,
+      isCurrent: brightness === state.brightness,
+      isClashing: false,
+    }));
+  }
+
+  return FIXED_COLORS.brightness.map((color, brightness) => {
+    const brightnessState = {
+      ...state,
+      brightness,
+    };
+    const brightnessStatuses = createColorStatuses(brightnessState);
+    const targetStatus = brightnessStatuses[selectedChipId];
+
+    return {
+      brightness,
+      color,
+      isCurrent: brightness === state.brightness,
+      isClashing: !judgeTargetStatus(state, targetStatus, baseAnalysis),
+    };
+  });
 }
 
 function createStaticKey(state) {
@@ -373,6 +390,7 @@ export function createCircleModel(state) {
   });
 
   return {
+    brightnessChips: createBrightnessChips(state, selectedChipId, baseAnalysis),
     chips,
     colorStatuses,
     layout: LAYOUT,

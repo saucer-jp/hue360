@@ -4,10 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "serve -s public",
-    "test": "node --test"
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.js",
+    "generate:munsell": "node scripts/generate-munsell-fixed-colors.js",
+    "test": "node --test",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
+    "culori": "^4.0.2",
+    "serve-handler": "^6.1.7",
     "serve": "^14.2.4"
+  },
+  "devDependencies": {
+    "vite": "^8.0.8"
   }
 }
