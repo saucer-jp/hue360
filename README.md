@@ -37,7 +37,8 @@ Vite は開発サーバーとビルドを担う基盤で、アプリ自体は引
 Heroku へデプロイする場合:
 
 - デプロイ時に `heroku-postbuild` で `npm run build` を実行し、`dist/` を生成します。
-- 起動時は `npm start` で `dist/` を静的配信します。
+- 起動時は `npm start` で `dist/` を配信します。
+- `https://hue360.herokuapp.com/` へのアクセスは `https://www.hue360.me/` へ恒久的にリダイレクトします。
 
 ```bash
 git push heroku main
