@@ -1,4 +1,4 @@
-import { hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
+import { getSharedChroma, hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
 import { FIXED_COLORS } from '../resources/fixed-color-resources.js';
 
 const LAYOUT = {
@@ -10,12 +10,41 @@ const LAYOUT = {
 };
 
 const staticCircleCache = new Map();
-const brightnessLevels = FIXED_COLORS.brightness.map(webToOklch);
-const darkestBrightnessOklch = brightnessLevels.at(-1);
+const MAX_CACHED_PALETTES = 32;
 const CHROMA_MIN_RATIO = 0.12;
+// 明部は共通Cと色相別上限の差を90%戻し、暗部は色相間の彩度差を抑える。
+const CHROMA_RECOVERY = 0.9;
+const DARK_CHROMA_GAIN_RATIO = 0.5;
+const DARK_CHROMA_LIGHTNESS = 0.45;
+const FULL_CHROMA_LIGHTNESS = 0.65;
+const DARKEST_OUTER_LIGHTNESS = 0.36;
+const DARKEST_INNER_LIGHTNESS = 0.3;
 const LIGHTNESS_HEADROOM = 8 / 255;
 const OKLCH_MAX_CHROMA = 0.4;
 const LIGHTNESS_SCALE = 10;
+const VIVID_LIGHTNESS_SHIFT = 0.08;
+// ピンク側は0度をまたぐため、末尾の赤を360度以降として扱う。
+const MUNSELL_HUE_TRANSITIONS = [
+  { startHue: 40, endHue: 160 },
+  { startHue: 210, endHue: 290 },
+  { startHue: 290, endHue: 380 },
+];
+const HUE_TRANSITION_SAMPLE_STEP = 0.5;
+const HUE_TRANSITION_EDGE_RATIO = 0.15;
+let munsellHueTransitions;
+// 全色相の色域を活かし、赤・青・黄付近にはさらに広い明度幅を許容する。
+const PRIMARY_TONE_BOOSTS = [
+  { hue: webToOklch('#ff0000').h, radius: 24, lightnessShift: -0.11 },
+  { hue: webToOklch('#ffff00').h, radius: 30, lightnessShift: 0.24 },
+  { hue: webToOklch('#0000ff').h, radius: 40, lightnessShift: -0.18 },
+];
+const colorProfiles = Object.fromEntries(['munsell', 'rgb', 'rgb+'].map((colorSpace) => {
+  const anchors = FIXED_COLORS[colorSpace].map(webToOklch);
+  return [colorSpace, {
+    anchors,
+    lightness: anchors.reduce((sum, color) => sum + color.l, 0) / anchors.length,
+  }];
+}));
 
 function normalizeHueIndex(index, hueStep) {
   return ((index % hueStep) + hueStep) % hueStep;
@@ -86,17 +115,6 @@ export function getHueInterpolation(hueIndex, hueCount, colorCount) {
   };
 }
 
-function getBetweenColor(startColor, endColor, blend) {
-  const start = webToOklch(startColor);
-  const end = webToOklch(endColor);
-
-  return oklchToWeb({
-    l: start.l + (end.l - start.l) * blend,
-    c: start.c + (end.c - start.c) * blend,
-    h: interpolateHue(start.h, end.h, blend),
-  });
-}
-
 function getBetweenColorByHsb(startColor, endColor, blend) {
   const start = webToHsb(startColor);
   const end = webToHsb(endColor);
@@ -108,74 +126,201 @@ function getBetweenColorByHsb(startColor, endColor, blend) {
   });
 }
 
-function applyFlatBrightness(webColor, state) {
-  const oklch = webToOklch(webColor);
-  const range = (oklch.l - darkestBrightnessOklch.l) / FIXED_COLORS.brightness.length;
-  oklch.l = Math.max(0, oklch.l - range * state.brightness);
-  return oklchToWeb(oklch);
+function smoothWeight(value) {
+  const progress = Math.max(0, Math.min(1, value));
+  return progress ** 2 * (3 - 2 * progress);
 }
 
-function applyChroma(webColor, count, state) {
-  const oklch = webToOklch(webColor);
-  const originalChroma = oklch.c;
-  const range = oklch.c / (state.chromaStep - 1);
-  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const minimumChroma = originalChroma * CHROMA_MIN_RATIO * chromaProgress;
-  oklch.c = Math.max(minimumChroma, oklch.c - range * (count.chroma - 1));
-  return oklchToWeb(oklch);
-}
-
-function applyBrightness(webColor, count, state) {
-  const oklch = webToOklch(webColor);
-  const endColor = brightnessLevels[state.brightness];
-  const max = Math.max(oklch.l, endColor.l);
-  const min = Math.min(oklch.l, endColor.l);
-  const range = (max - min) / (state.chromaStep - 1);
-  const offset = range * (count.chroma - 1);
-
-  if (max === oklch.l) {
-    oklch.l -= offset;
-  } else {
-    oklch.l += offset;
-  }
-
-  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const maxLightness = 1 - LIGHTNESS_HEADROOM * chromaProgress;
-  oklch.l = Math.min(oklch.l, maxLightness);
-
-  return oklchToWeb(oklch);
-}
-
-function getWebColor(hueIndex, state, fixedColors, hueCount) {
-  const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, hueCount, fixedColors.length);
-  let webColor;
-
-  if (blend === 0) {
-    webColor = fixedColors[startIndex];
-  } else if (state.colorSpace === 'rgb') {
-    webColor = getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend);
-  } else {
-    webColor = getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
-  }
-
-  const count = {
-    chroma: Math.floor(hueIndex / hueCount) + 1,
+function getVividLightnessShift(hue, lightness) {
+  const primary = PRIMARY_TONE_BOOSTS.find(({ hue: center, radius }) => getCircularHueDiff(hue, center) < radius);
+  const weight = primary ? smoothWeight(1 - getCircularHueDiff(hue, primary.hue) / primary.radius) : 0;
+  let lower = lightness - VIVID_LIGHTNESS_SHIFT;
+  let upper = lightness + VIVID_LIGHTNESS_SHIFT;
+  if (primary?.lightnessShift < 0) lower += (primary.lightnessShift + VIVID_LIGHTNESS_SHIFT) * weight;
+  if (primary?.lightnessShift > 0) upper += (primary.lightnessShift - VIVID_LIGHTNESS_SHIFT) * weight;
+  let best = { l: lightness, c: getSharedChroma(lightness, OKLCH_MAX_CHROMA, [hue]) };
+  const consider = (l) => {
+    const c = getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]);
+    if (c > best.c) best = { l, c };
+    return c;
   };
+  consider(lower);
+  consider(upper);
+  // 色域の頂点を越えて彩度が下がらないよう、許容する明度幅の中だけを探索する。
+  for (let iteration = 0; iteration < 12; iteration += 1) {
+    const left = lower + (upper - lower) / 3;
+    const right = upper - (upper - lower) / 3;
+    if (consider(left) < consider(right)) lower = left;
+    else upper = right;
+  }
+  return best.l - lightness;
+}
 
-  webColor = applyFlatBrightness(webColor, state);
-  webColor = applyChroma(webColor, count, state);
-  return applyBrightness(webColor, count, state);
+function getMunsellHueTransitions() {
+  if (munsellHueTransitions) return munsellHueTransitions;
+
+  const profile = colorProfiles.munsell;
+  const lightness = webToOklch(oklchToWeb({ l: profile.lightness, c: 0, h: 0 })).l;
+  const anchorHues = profile.anchors.map(({ h }) => h < profile.anchors[0].h ? h + 360 : h);
+  anchorHues.push(anchorHues[0] + 360);
+  const positionAtHue = (hue) => {
+    const index = anchorHues.findIndex((start, i) => start <= hue && anchorHues[i + 1] >= hue);
+    const start = anchorHues[index];
+    return (index + (hue - start) / (anchorHues[index + 1] - start)) / profile.anchors.length;
+  };
+  // 最明・最高彩度の経路を固定し、スライダや分割数で色相の位置が動かないようにする。
+  munsellHueTransitions = MUNSELL_HUE_TRANSITIONS.map(({ startHue, endHue }) => {
+    const samples = [];
+    let distance = 0;
+    let previous;
+    // 高彩度では明度も大きく変わるため、OKLabの色差で中間色を配分する。
+    for (let hue = startHue; hue <= endHue; hue += HUE_TRANSITION_SAMPLE_STEP) {
+      const l = lightness + getVividLightnessShift(hue, lightness);
+      const c = getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]);
+      const angle = hue * Math.PI / 180;
+      const color = { l, a: c * Math.cos(angle), b: c * Math.sin(angle) };
+      if (previous) distance += Math.hypot(color.l - previous.l, color.a - previous.a, color.b - previous.b);
+      samples.push({ hue, distance });
+      previous = color;
+    }
+    return { startHue, endHue, start: positionAtHue(startHue), end: positionAtHue(endHue), samples, distance };
+  });
+  return munsellHueTransitions;
+}
+
+function redistributeMunsellHue(hue, position) {
+  const unwrappedHue = hue < colorProfiles.munsell.anchors[0].h ? hue + 360 : hue;
+  const transition = getMunsellHueTransitions().find(({ startHue, endHue }) => unwrappedHue > startHue && unwrappedHue < endHue);
+  if (!transition) return hue;
+  const progress = (position - transition.start) / (transition.end - transition.start);
+  const distance = progress * transition.distance;
+  const index = transition.samples.findIndex((sample) => sample.distance >= distance);
+  const start = transition.samples[index - 1];
+  const end = transition.samples[index];
+  const targetHue = start.hue + (end.hue - start.hue) * (distance - start.distance) / (end.distance - start.distance);
+  // 区間の両端は元の配列へ滑らかにつなぎ、隣接する色相に新たな段差を作らない。
+  const weight = smoothWeight(progress / HUE_TRANSITION_EDGE_RATIO)
+    * smoothWeight((1 - progress) / HUE_TRANSITION_EDGE_RATIO);
+  const result = unwrappedHue + (targetHue - unwrappedHue) * weight;
+  return result >= 360 ? result - 360 : result;
+}
+
+function enhanceVividTones(hues, rings, brightness, brightestLightness) {
+  // 最明段で決めた補正を明度6までに線形に解消し、青も明度操作で必ず暗くする。
+  const brightnessWeight = Math.max(0, 1 - brightness / 6);
+  const boosts = hues.map((hue, index) => {
+    if (brightnessWeight === 0) return { l: 0, c: 0 };
+    const l = getVividLightnessShift(hue, brightestLightness) * brightnessWeight;
+    const limit = getSharedChroma(rings[0].l + l, OKLCH_MAX_CHROMA, [hue]);
+    return { l, c: (limit - rings[0].chromas[index]) * brightnessWeight };
+  });
+  let previousChromas;
+  return rings.map((tone, ring) => {
+    const radialWeight = (1 - ring / (rings.length - 1)) ** 2;
+    const lightnesses = boosts.map((boost) => tone.l + boost.l * radialWeight);
+    const chromas = boosts.map((boost, index) => getSharedChroma(
+      lightnesses[index],
+      Math.min(tone.chromas[index] + boost.c * radialWeight, previousChromas?.[index] ?? Infinity),
+      [hues[index]],
+    ));
+    previousChromas = chromas;
+    return { ...tone, lightnesses, chromas };
+  });
+}
+
+function applySaturation(hues, rings, saturation) {
+  // 上限側の減衰を緩やかにする。90%→0.99、75%→0.9375、50%→0.75。
+  const amount = 1 - (1 - saturation / 100) ** 2;
+  if (amount === 1) return rings;
+
+  // 彩度を下げるほど、色相別の彩度差と明度補正を共通トーンへ近づける。
+  const variationWeight = amount ** 2;
+  let previousChromas;
+  return rings.map((tone) => {
+    const commonChroma = getSharedChroma(tone.l, Math.min(tone.c, ...tone.chromas), hues);
+    const lightnesses = tone.lightnesses.map((lightness) => tone.l + (lightness - tone.l) * variationWeight);
+    const chromas = tone.chromas.map((chroma, index) => getSharedChroma(
+      lightnesses[index],
+      Math.min(amount * (commonChroma + (chroma - commonChroma) * variationWeight), previousChromas?.[index] ?? Infinity),
+      [hues[index]],
+    ));
+    previousChromas = chromas;
+    return { ...tone, c: commonChroma * amount, lightnesses, chromas };
+  });
+}
+
+export function createCircleTones(state) {
+  const fixedColors = FIXED_COLORS[state.colorSpace];
+  const profile = colorProfiles[state.colorSpace];
+  const hues = Array.from({ length: state.hueStep }, (_, hueIndex) => {
+    const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, state.hueStep, fixedColors.length);
+    let hue;
+    if (blend === 0) hue = profile.anchors[startIndex].h;
+    else if (state.colorSpace === 'rgb') {
+      // RGBの色相配列は従来のHSB補間から取り出し、トーンとは分けて扱う。
+      hue = webToOklch(getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend)).h;
+    } else hue = interpolateHue(profile.anchors[startIndex].h, profile.anchors[endIndex].h, blend);
+    return state.colorSpace === 'munsell' ? redistributeMunsellHue(hue, hueIndex / state.hueStep) : hue;
+  });
+
+  const brightnessProgress = state.brightness / (FIXED_COLORS.brightness.length - 1);
+  const rings = [];
+  let outerChromaLimits;
+  let previousChromas;
+
+  for (let ring = 0; ring < state.chromaStep; ring += 1) {
+    const progress = ring / (state.chromaStep - 1);
+    const brightestLightness = Math.min(
+      profile.lightness + (1 - profile.lightness) * progress,
+      1 - LIGHTNESS_HEADROOM * progress,
+    );
+    const darkestLightness = DARKEST_OUTER_LIGHTNESS
+      + (DARKEST_INNER_LIGHTNESS - DARKEST_OUTER_LIGHTNESS) * progress;
+    // 黒を終点にせず、色を判別できる暗色から最明色までを9等分する。
+    const lightness = brightestLightness + (darkestLightness - brightestLightness) * brightnessProgress;
+    const l = webToOklch(oklchToWeb({ l: lightness, c: 0, h: 0 })).l;
+    if (ring === 0) {
+      outerChromaLimits = hues.map((hue) => getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]));
+    }
+    const chromaRatio = 1 - (1 - CHROMA_MIN_RATIO) * progress;
+    const availableChromas = ring === 0 ? outerChromaLimits : hues.map((hue, index) =>
+      getSharedChroma(l, outerChromaLimits[index] * chromaRatio, [hue]),
+    );
+    const c = Math.min(...availableChromas);
+    const recoveryProgress = Math.max(0, Math.min(1,
+      (l - DARK_CHROMA_LIGHTNESS) / (FULL_CHROMA_LIGHTNESS - DARK_CHROMA_LIGHTNESS),
+    ));
+    const recoveryWeight = recoveryProgress ** 2 * (3 - 2 * recoveryProgress);
+    const chromas = availableChromas.map((available, index) => {
+      const gain = (available - c) * CHROMA_RECOVERY;
+      // 暗部の上限は共通Cの1.5倍。色相に依存しない制限を明部へ滑らかに解除する。
+      const darkGain = Math.min(gain, c * DARK_CHROMA_GAIN_RATIO);
+      const recovered = Math.min(
+        c + darkGain * (1 - recoveryWeight) + gain * recoveryWeight,
+        previousChromas?.[index] ?? Infinity,
+      );
+      // 青付近ではCの補間点が色域外に出る場合があるため、復元後にも確認する。
+      return getSharedChroma(l, recovered, [hues[index]]);
+    });
+    previousChromas = chromas;
+    rings.push({ l, c, chromas });
+  }
+
+  const brightestLightness = webToOklch(oklchToWeb({ l: profile.lightness, c: 0, h: 0 })).l;
+  const vividRings = enhanceVividTones(hues, rings, state.brightness, brightestLightness);
+  return { hues, rings: applySaturation(hues, vividRings, state.saturation) };
 }
 
 export function createColorStatuses(state) {
-  const fixedColors = FIXED_COLORS[state.colorSpace];
+  const { hues, rings } = createCircleTones(state);
   const total = state.hueStep * state.chromaStep;
   const result = [];
 
   for (let index = 0; index < total; index += 1) {
     const hueIndex = index % state.hueStep;
     const chromaIndex = Math.floor(index / state.hueStep);
-    const web = getWebColor(index, state, fixedColors, state.hueStep);
+    const tone = rings[chromaIndex];
+    const web = oklchToWeb({ l: tone.lightnesses[hueIndex], c: tone.chromas[hueIndex], h: hues[hueIndex] });
     result.push({
       id: index,
       web,
@@ -336,8 +481,14 @@ function createBrightnessChips(state, selectedChipId, baseAnalysis) {
       ...state,
       brightness,
     };
-    const brightnessStatuses = createColorStatuses(brightnessState);
-    const targetStatus = brightnessStatuses[selectedChipId];
+    // 段数による判定では、10候補分の全色生成は不要。
+    const targetStatus = baseAnalysis.kind === 'step'
+      ? { stepNum: {
+        hue: selectedChipId % state.hueStep + 1,
+        chroma: Math.floor(selectedChipId / state.hueStep) + 1,
+        brightness,
+      } }
+      : createColorStatuses(brightnessState)[selectedChipId];
 
     return {
       brightness,
@@ -349,7 +500,7 @@ function createBrightnessChips(state, selectedChipId, baseAnalysis) {
 }
 
 function createStaticKey(state) {
-  return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness].join(':');
+  return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness, state.saturation].join(':');
 }
 
 function getStaticCircleData(state) {
@@ -363,6 +514,10 @@ function getStaticCircleData(state) {
     chipStatuses: createChipStatuses(state),
   };
 
+  // 連続したスライダー操作で全設定のパレットを保持し続けない。
+  if (staticCircleCache.size >= MAX_CACHED_PALETTES) {
+    staticCircleCache.delete(staticCircleCache.keys().next().value);
+  }
   staticCircleCache.set(cacheKey, staticData);
   return staticData;
 }
