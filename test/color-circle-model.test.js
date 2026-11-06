@@ -26,18 +26,96 @@ function hueDifference(a, b) {
   return Math.min(difference, 360 - difference);
 }
 
-test('all color spaces retain anchor hues while replacing their tones', () => {
+test('anchor hues stay intact outside the adjusted Munsell transitions', () => {
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     const state = createInitialState({ colorSpace, hueStep: 20 });
     const tones = createCircleTones(state);
     const firstRing = createColorStatuses(state).slice(0, 20);
     const anchorHues = FIXED_COLORS[colorSpace].map((color) => webToOklch(color).h);
-    assert.deepEqual(tones.hues, anchorHues);
+    anchorHues.forEach((hue, index) => {
+      const adjusted = (hue > 40 && hue < 160) || hue > 210 || hue < 20;
+      if (colorSpace !== 'munsell' || !adjusted) assert.equal(tones.hues[index], hue);
+    });
     firstRing.forEach((chip, index) => {
-      assert.ok(hueDifference(chip.oklch.h, anchorHues[index]) < 1);
+      assert.ok(hueDifference(chip.oklch.h, tones.hues[index]) < 1);
       assert.ok(Math.abs(chip.oklch.l - tones.rings[0].lightnesses[index]) < 0.003);
       assert.ok(Math.abs(chip.oklch.c - tones.rings[0].chromas[index]) < 0.003);
     });
+  }
+});
+
+test('Munsell gives blue more steps and keeps the cyan-to-blue transition gradual', () => {
+  for (const hueStep of [42, 100]) {
+    const state = createInitialState({ hueStep, chromaStep: 10, saturation: 100 });
+    const colors = createColorStatuses(state);
+    const { hues } = createCircleTones(state);
+    const blueCount = hues.filter((hue) => hue >= 250 && hue < 280).length;
+    const cyanCount = hues.filter((hue) => hue >= 210 && hue < 250).length;
+    assert.ok(blueCount >= hueStep * 0.09, 'blue receives a visible span of the wheel');
+    assert.ok(cyanCount <= hueStep * 0.1, 'light blue no longer dominates the transition');
+    for (let ring = 0; ring < state.chromaStep; ring += 1) {
+      for (let index = 1; index < hueStep; index += 1) {
+        if (hues[index] < 210 || hues[index - 1] > 290) continue;
+        assert.ok(hues[index] > hues[index - 1], 'transition does not reverse hue order');
+        const a = colors[ring * hueStep + index - 1].oklch;
+        const b = colors[ring * hueStep + index].oklch;
+        const delta = Math.hypot(
+          a.l - b.l,
+          a.c * Math.cos(a.h * Math.PI / 180) - b.c * Math.cos(b.h * Math.PI / 180),
+          a.c * Math.sin(a.h * Math.PI / 180) - b.c * Math.sin(b.h * Math.PI / 180),
+        );
+        assert.ok(delta < 4.3 / hueStep, `${hueStep}/${ring}/${index}: abrupt blue transition (${delta})`);
+      }
+    }
+  }
+});
+
+test('Munsell hue positions stay fixed across brightness saturation and subdivision changes', () => {
+  const state = createInitialState({ hueStep: 100 });
+  const reference = createCircleTones(state).hues;
+  for (const brightness of [0, 3, 6, 9]) {
+    for (const saturation of [0, 25, 50, 75, 100]) {
+      assert.deepEqual(createCircleTones({ ...state, brightness, saturation, chromaStep: 10 }).hues, reference);
+    }
+  }
+  const coarse = createCircleTones({ ...state, hueStep: 20 }).hues;
+  coarse.forEach((hue, index) => assert.ok(hueDifference(hue, reference[index * 5]) < 1e-9));
+});
+
+test('Munsell pink and yellow transitions have gradual color changes on every ring', () => {
+  for (const hueStep of [42, 100]) {
+    const state = createInitialState({ hueStep, chromaStep: 10, saturation: 100 });
+    const colors = createColorStatuses(state);
+    for (const { start, end, limit } of [
+      { start: 0.07, end: 0.41, limit: 2.7 },
+      { start: 0.78, end: 1, limit: 3.1 },
+    ]) {
+      for (let ring = 0; ring < state.chromaStep; ring += 1) {
+        for (let index = Math.ceil(start * hueStep); index < end * hueStep; index += 1) {
+          const a = colors[ring * hueStep + index - 1].oklch;
+          const b = colors[ring * hueStep + index].oklch;
+          const delta = Math.hypot(
+            a.l - b.l,
+            a.c * Math.cos(a.h * Math.PI / 180) - b.c * Math.cos(b.h * Math.PI / 180),
+            a.c * Math.sin(a.h * Math.PI / 180) - b.c * Math.sin(b.h * Math.PI / 180),
+          );
+          assert.ok(delta < limit / hueStep, `${hueStep}/${ring}/${index}: abrupt pink/yellow transition (${delta})`);
+        }
+      }
+    }
+  }
+});
+
+test('Munsell hue order stays continuous across the pink-to-red zero-degree boundary', () => {
+  for (const hueStep of [10, 17, 20, 42, 100]) {
+    const { hues } = createCircleTones(createInitialState({ hueStep }));
+    let total = 0;
+    hues.forEach((hue, index) => {
+      const delta = (hues[(index + 1) % hueStep] - hue + 360) % 360;
+      assert.ok(delta > 0 && delta < 90, `${hueStep}/${index}: hue reversal or discontinuity`);
+      total += delta;
+    });
+    assert.ok(Math.abs(total - 360) < 1e-9, 'complete one ordered turn');
   }
 });
 
@@ -73,7 +151,7 @@ test('vivid rings stay in gamut with bounded tone variation and descending spoke
     for (const hueStep of [10, 17, 20, 42, 100]) {
       for (const chromaStep of [3, 7, 10]) {
         for (let brightness = 0; brightness < 10; brightness += 1) {
-          const state = createInitialState({ colorSpace, hueStep, chromaStep, brightness });
+          const state = createInitialState({ colorSpace, hueStep, chromaStep, brightness, saturation: 100 });
           const { hues, rings } = createCircleTones(state);
           const colors = createColorStatuses(state);
           rings.forEach((tone, ringIndex) => {
@@ -112,7 +190,7 @@ test('vivid rings stay in gamut with bounded tone variation and descending spoke
 test('bright outer colors retain most of each hue gamut', () => {
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     for (const brightness of [0, 1]) {
-      const state = createInitialState({ colorSpace, brightness });
+      const state = createInitialState({ colorSpace, brightness, saturation: 100 });
       const { hues, rings } = createCircleTones(state);
       const outer = rings[0];
       const limits = hues.map((hue, index) => getSharedChroma(outer.lightnesses[index], 0.4, [hue]));
@@ -138,7 +216,7 @@ test('pure reds blues and especially yellows gain chroma within limited lightnes
     { hex: '#0000ff', minShift: -0.181, maxShift: -0.17 },
   ];
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
-    const state = createInitialState({ colorSpace, hueStep: 100, chromaStep: 7 });
+    const state = createInitialState({ colorSpace, hueStep: 100, chromaStep: 7, saturation: 100 });
     const { hues, rings } = createCircleTones(state);
     const colors = createColorStatuses(state);
     const outer = rings[0];
@@ -168,7 +246,7 @@ test('primary tone variation fades inward and disappears on the dark side', () =
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     let previousOuterVariation = Infinity;
     for (let brightness = 0; brightness < 10; brightness += 1) {
-      const { rings } = createCircleTones(createInitialState({ colorSpace, hueStep: 100, chromaStep: 10, brightness }));
+      const { rings } = createCircleTones(createInitialState({ colorSpace, hueStep: 100, chromaStep: 10, brightness, saturation: 100 }));
       const variations = rings.map((tone) => Math.max(...tone.lightnesses) - Math.min(...tone.lightnesses));
       assert.ok(variations[0] <= previousOuterVariation, 'tone matching increases as the palette gets darker');
       previousOuterVariation = variations[0];
@@ -205,7 +283,7 @@ test('zero saturation produces one neutral gray per ring without changing bright
 test('lower saturation improves lightness and relative chroma uniformity while remaining in gamut', () => {
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     for (const brightness of [0, 3, 7, 9]) {
-      const state = createInitialState({ colorSpace, brightness, hueStep: 42, chromaStep: 7 });
+      const state = createInitialState({ colorSpace, brightness, hueStep: 42, chromaStep: 7, saturation: 100 });
       let previous;
       for (const saturation of [100, 75, 50, 25, 1, 0]) {
         const { hues, rings } = createCircleTones({ ...state, saturation });
@@ -279,7 +357,7 @@ test('dark rings cap chroma outliers while retaining hue and visible tint', () =
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     for (const hueStep of [17, 42, 100]) {
       for (const brightness of [7, 8, 9]) {
-        const state = createInitialState({ colorSpace, hueStep, brightness, chromaStep: 10 });
+        const state = createInitialState({ colorSpace, hueStep, brightness, chromaStep: 10, saturation: 100 });
         const { hues, rings } = createCircleTones(state);
         const colors = createColorStatuses(state);
         rings.forEach((tone, ringIndex) => {
@@ -310,7 +388,7 @@ test('dark rings cap chroma outliers while retaining hue and visible tint', () =
 test('base brightness divides the nonblack range evenly and all colors darken monotonically', () => {
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     for (const chromaStep of [3, 7, 10]) {
-      const states = Array.from({ length: 10 }, (_, brightness) => createInitialState({ colorSpace, chromaStep, brightness }));
+      const states = Array.from({ length: 10 }, (_, brightness) => createInitialState({ colorSpace, chromaStep, brightness, saturation: 100 }));
       const palettes = states.map(createColorStatuses);
       const tones = states.map(createCircleTones);
       tones.forEach(({ rings }, brightness) => rings.forEach((tone, ringIndex) => {

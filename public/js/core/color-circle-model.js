@@ -23,6 +23,15 @@ const LIGHTNESS_HEADROOM = 8 / 255;
 const OKLCH_MAX_CHROMA = 0.4;
 const LIGHTNESS_SCALE = 10;
 const VIVID_LIGHTNESS_SHIFT = 0.08;
+// ピンク側は0度をまたぐため、末尾の赤を360度以降として扱う。
+const MUNSELL_HUE_TRANSITIONS = [
+  { startHue: 40, endHue: 160 },
+  { startHue: 210, endHue: 290 },
+  { startHue: 290, endHue: 380 },
+];
+const HUE_TRANSITION_SAMPLE_STEP = 0.5;
+const HUE_TRANSITION_EDGE_RATIO = 0.15;
+let munsellHueTransitions;
 // 全色相の色域を活かし、赤・青・黄付近にはさらに広い明度幅を許容する。
 const PRIMARY_TONE_BOOSTS = [
   { hue: webToOklch('#ff0000').h, radius: 24, lightnessShift: -0.11 },
@@ -147,6 +156,55 @@ function getVividLightnessShift(hue, lightness) {
   return best.l - lightness;
 }
 
+function getMunsellHueTransitions() {
+  if (munsellHueTransitions) return munsellHueTransitions;
+
+  const profile = colorProfiles.munsell;
+  const lightness = webToOklch(oklchToWeb({ l: profile.lightness, c: 0, h: 0 })).l;
+  const anchorHues = profile.anchors.map(({ h }) => h < profile.anchors[0].h ? h + 360 : h);
+  anchorHues.push(anchorHues[0] + 360);
+  const positionAtHue = (hue) => {
+    const index = anchorHues.findIndex((start, i) => start <= hue && anchorHues[i + 1] >= hue);
+    const start = anchorHues[index];
+    return (index + (hue - start) / (anchorHues[index + 1] - start)) / profile.anchors.length;
+  };
+  // 最明・最高彩度の経路を固定し、スライダや分割数で色相の位置が動かないようにする。
+  munsellHueTransitions = MUNSELL_HUE_TRANSITIONS.map(({ startHue, endHue }) => {
+    const samples = [];
+    let distance = 0;
+    let previous;
+    // 高彩度では明度も大きく変わるため、OKLabの色差で中間色を配分する。
+    for (let hue = startHue; hue <= endHue; hue += HUE_TRANSITION_SAMPLE_STEP) {
+      const l = lightness + getVividLightnessShift(hue, lightness);
+      const c = getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]);
+      const angle = hue * Math.PI / 180;
+      const color = { l, a: c * Math.cos(angle), b: c * Math.sin(angle) };
+      if (previous) distance += Math.hypot(color.l - previous.l, color.a - previous.a, color.b - previous.b);
+      samples.push({ hue, distance });
+      previous = color;
+    }
+    return { startHue, endHue, start: positionAtHue(startHue), end: positionAtHue(endHue), samples, distance };
+  });
+  return munsellHueTransitions;
+}
+
+function redistributeMunsellHue(hue, position) {
+  const unwrappedHue = hue < colorProfiles.munsell.anchors[0].h ? hue + 360 : hue;
+  const transition = getMunsellHueTransitions().find(({ startHue, endHue }) => unwrappedHue > startHue && unwrappedHue < endHue);
+  if (!transition) return hue;
+  const progress = (position - transition.start) / (transition.end - transition.start);
+  const distance = progress * transition.distance;
+  const index = transition.samples.findIndex((sample) => sample.distance >= distance);
+  const start = transition.samples[index - 1];
+  const end = transition.samples[index];
+  const targetHue = start.hue + (end.hue - start.hue) * (distance - start.distance) / (end.distance - start.distance);
+  // 区間の両端は元の配列へ滑らかにつなぎ、隣接する色相に新たな段差を作らない。
+  const weight = smoothWeight(progress / HUE_TRANSITION_EDGE_RATIO)
+    * smoothWeight((1 - progress) / HUE_TRANSITION_EDGE_RATIO);
+  const result = unwrappedHue + (targetHue - unwrappedHue) * weight;
+  return result >= 360 ? result - 360 : result;
+}
+
 function enhanceVividTones(hues, rings, brightness, brightestLightness) {
   // 最明段で決めた補正を明度6までに線形に解消し、青も明度操作で必ず暗くする。
   const brightnessWeight = Math.max(0, 1 - brightness / 6);
@@ -196,14 +254,13 @@ export function createCircleTones(state) {
   const profile = colorProfiles[state.colorSpace];
   const hues = Array.from({ length: state.hueStep }, (_, hueIndex) => {
     const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, state.hueStep, fixedColors.length);
-    if (blend === 0) {
-      return profile.anchors[startIndex].h;
-    }
-    if (state.colorSpace === 'rgb') {
+    let hue;
+    if (blend === 0) hue = profile.anchors[startIndex].h;
+    else if (state.colorSpace === 'rgb') {
       // RGBの色相配列は従来のHSB補間から取り出し、トーンとは分けて扱う。
-      return webToOklch(getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend)).h;
-    }
-    return interpolateHue(profile.anchors[startIndex].h, profile.anchors[endIndex].h, blend);
+      hue = webToOklch(getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend)).h;
+    } else hue = interpolateHue(profile.anchors[startIndex].h, profile.anchors[endIndex].h, blend);
+    return state.colorSpace === 'munsell' ? redistributeMunsellHue(hue, hueIndex / state.hueStep) : hue;
   });
 
   const brightnessProgress = state.brightness / (FIXED_COLORS.brightness.length - 1);

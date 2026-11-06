@@ -34,7 +34,7 @@ test('renderController applies current and clash classes to brightness chips', (
   const brightnessNodes = Array.from({ length: 4 }, (_, brightness) => createBrightnessNode(brightness));
   const inputs = [
     { dataset: { setting: 'judgeEnabled' }, value: 'false' },
-    { dataset: { setting: 'saturation' }, value: '100' },
+    { dataset: { setting: 'saturation' }, value: '80' },
   ];
   const settingValues = [
     { dataset: { settingValue: 'brightness' }, textContent: '' },
