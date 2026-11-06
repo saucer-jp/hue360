@@ -1,4 +1,4 @@
-import { hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
+import { getSharedChroma, hsbToWeb, oklchToWeb, rgbToWeb, webToHsb, webToOklch, webToRgb } from './color-math.js';
 import { FIXED_COLORS } from '../resources/fixed-color-resources.js';
 
 const LAYOUT = {
@@ -10,12 +10,30 @@ const LAYOUT = {
 };
 
 const staticCircleCache = new Map();
-const brightnessLevels = FIXED_COLORS.brightness.map(webToOklch);
-const darkestBrightnessOklch = brightnessLevels.at(-1);
 const CHROMA_MIN_RATIO = 0.12;
+// 明部は共通Cと色相別上限の差を90%戻し、暗部は色相間の彩度差を抑える。
+const CHROMA_RECOVERY = 0.9;
+const DARK_CHROMA_GAIN_RATIO = 0.5;
+const DARK_CHROMA_LIGHTNESS = 0.45;
+const FULL_CHROMA_LIGHTNESS = 0.65;
+const DARKEST_OUTER_LIGHTNESS = 0.36;
+const DARKEST_INNER_LIGHTNESS = 0.3;
 const LIGHTNESS_HEADROOM = 8 / 255;
 const OKLCH_MAX_CHROMA = 0.4;
 const LIGHTNESS_SCALE = 10;
+// 純色付近だけ明るさの一致を緩める。黄色は明るく、赤・青は少し暗くして色域を活かす。
+const PRIMARY_TONE_BOOSTS = [
+  { hue: webToOklch('#ff0000').h, radius: 24, lightnessShift: -0.04 },
+  { hue: webToOklch('#ffff00').h, radius: 30, lightnessShift: 0.14 },
+  { hue: webToOklch('#0000ff').h, radius: 40, lightnessShift: -0.045 },
+];
+const colorProfiles = Object.fromEntries(['munsell', 'rgb', 'rgb+'].map((colorSpace) => {
+  const anchors = FIXED_COLORS[colorSpace].map(webToOklch);
+  return [colorSpace, {
+    anchors,
+    lightness: anchors.reduce((sum, color) => sum + color.l, 0) / anchors.length,
+  }];
+}));
 
 function normalizeHueIndex(index, hueStep) {
   return ((index % hueStep) + hueStep) % hueStep;
@@ -86,17 +104,6 @@ export function getHueInterpolation(hueIndex, hueCount, colorCount) {
   };
 }
 
-function getBetweenColor(startColor, endColor, blend) {
-  const start = webToOklch(startColor);
-  const end = webToOklch(endColor);
-
-  return oklchToWeb({
-    l: start.l + (end.l - start.l) * blend,
-    c: start.c + (end.c - start.c) * blend,
-    h: interpolateHue(start.h, end.h, blend),
-  });
-}
-
 function getBetweenColorByHsb(startColor, endColor, blend) {
   const start = webToHsb(startColor);
   const end = webToHsb(endColor);
@@ -108,74 +115,131 @@ function getBetweenColorByHsb(startColor, endColor, blend) {
   });
 }
 
-function applyFlatBrightness(webColor, state) {
-  const oklch = webToOklch(webColor);
-  const range = (oklch.l - darkestBrightnessOklch.l) / FIXED_COLORS.brightness.length;
-  oklch.l = Math.max(0, oklch.l - range * state.brightness);
-  return oklchToWeb(oklch);
+function smoothWeight(value) {
+  const progress = Math.max(0, Math.min(1, value));
+  return progress ** 2 * (3 - 2 * progress);
 }
 
-function applyChroma(webColor, count, state) {
-  const oklch = webToOklch(webColor);
-  const originalChroma = oklch.c;
-  const range = oklch.c / (state.chromaStep - 1);
-  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const minimumChroma = originalChroma * CHROMA_MIN_RATIO * chromaProgress;
-  oklch.c = Math.max(minimumChroma, oklch.c - range * (count.chroma - 1));
-  return oklchToWeb(oklch);
-}
+function getPrimaryToneBoost(hue, lightness, chroma, brightnessWeight) {
+  const primary = PRIMARY_TONE_BOOSTS.find(({ hue: center, radius }) => getCircularHueDiff(hue, center) < radius);
+  if (!primary || brightnessWeight === 0) return { l: 0, c: 0 };
 
-function applyBrightness(webColor, count, state) {
-  const oklch = webToOklch(webColor);
-  const endColor = brightnessLevels[state.brightness];
-  const max = Math.max(oklch.l, endColor.l);
-  const min = Math.min(oklch.l, endColor.l);
-  const range = (max - min) / (state.chromaStep - 1);
-  const offset = range * (count.chroma - 1);
-
-  if (max === oklch.l) {
-    oklch.l -= offset;
-  } else {
-    oklch.l += offset;
-  }
-
-  const chromaProgress = (count.chroma - 1) / (state.chromaStep - 1);
-  const maxLightness = 1 - LIGHTNESS_HEADROOM * chromaProgress;
-  oklch.l = Math.min(oklch.l, maxLightness);
-
-  return oklchToWeb(oklch);
-}
-
-function getWebColor(hueIndex, state, fixedColors, hueCount) {
-  const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, hueCount, fixedColors.length);
-  let webColor;
-
-  if (blend === 0) {
-    webColor = fixedColors[startIndex];
-  } else if (state.colorSpace === 'rgb') {
-    webColor = getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend);
-  } else {
-    webColor = getBetweenColor(fixedColors[startIndex], fixedColors[endIndex], blend);
-  }
-
-  const count = {
-    chroma: Math.floor(hueIndex / hueCount) + 1,
+  const weight = smoothWeight(1 - getCircularHueDiff(hue, primary.hue) / primary.radius) * brightnessWeight;
+  const targetLightness = lightness + primary.lightnessShift * weight;
+  const originalLimit = getSharedChroma(lightness, OKLCH_MAX_CHROMA, [hue]);
+  let best = { l: lightness, c: originalLimit };
+  const consider = (l) => {
+    const c = getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]);
+    if (c > best.c) best = { l, c };
+    return c;
   };
+  consider(targetLightness);
+  let lower = Math.min(lightness, targetLightness);
+  let upper = Math.max(lightness, targetLightness);
+  // 色域の頂点を越えて彩度が下がらないよう、許容する明度幅の中だけを探索する。
+  for (let iteration = 0; iteration < 12; iteration += 1) {
+    const left = lower + (upper - lower) / 3;
+    const right = upper - (upper - lower) / 3;
+    if (consider(left) < consider(right)) lower = left;
+    else upper = right;
+  }
+  return {
+    l: best.l - lightness,
+    c: best.c - originalLimit + Math.max(0, originalLimit - chroma) * weight,
+  };
+}
 
-  webColor = applyFlatBrightness(webColor, state);
-  webColor = applyChroma(webColor, count, state);
-  return applyBrightness(webColor, count, state);
+function enhancePrimaryTones(hues, rings, brightness) {
+  // 明度0で最大、4以降は補正なし。低明度の彩度上限と黒に潰れない終点を維持する。
+  const brightnessWeight = 1 - smoothWeight(brightness / 4);
+  const boosts = hues.map((hue, index) =>
+    getPrimaryToneBoost(hue, rings[0].l, rings[0].chromas[index], brightnessWeight),
+  );
+  let previousChromas;
+  return rings.map((tone, ring) => {
+    const radialWeight = (1 - ring / (rings.length - 1)) ** 2;
+    const lightnesses = boosts.map((boost) => tone.l + boost.l * radialWeight);
+    const chromas = boosts.map((boost, index) => getSharedChroma(
+      lightnesses[index],
+      Math.min(tone.chromas[index] + boost.c * radialWeight, previousChromas?.[index] ?? Infinity),
+      [hues[index]],
+    ));
+    previousChromas = chromas;
+    return { ...tone, lightnesses, chromas };
+  });
+}
+
+export function createCircleTones(state) {
+  const fixedColors = FIXED_COLORS[state.colorSpace];
+  const profile = colorProfiles[state.colorSpace];
+  const hues = Array.from({ length: state.hueStep }, (_, hueIndex) => {
+    const { startIndex, endIndex, blend } = getHueInterpolation(hueIndex, state.hueStep, fixedColors.length);
+    if (blend === 0) {
+      return profile.anchors[startIndex].h;
+    }
+    if (state.colorSpace === 'rgb') {
+      // RGBの色相配列は従来のHSB補間から取り出し、トーンとは分けて扱う。
+      return webToOklch(getBetweenColorByHsb(fixedColors[startIndex], fixedColors[endIndex], blend)).h;
+    }
+    return interpolateHue(profile.anchors[startIndex].h, profile.anchors[endIndex].h, blend);
+  });
+
+  const brightnessProgress = state.brightness / (FIXED_COLORS.brightness.length - 1);
+  const rings = [];
+  let outerChromaLimits;
+  let previousChromas;
+
+  for (let ring = 0; ring < state.chromaStep; ring += 1) {
+    const progress = ring / (state.chromaStep - 1);
+    const brightestLightness = Math.min(
+      profile.lightness + (1 - profile.lightness) * progress,
+      1 - LIGHTNESS_HEADROOM * progress,
+    );
+    const darkestLightness = DARKEST_OUTER_LIGHTNESS
+      + (DARKEST_INNER_LIGHTNESS - DARKEST_OUTER_LIGHTNESS) * progress;
+    // 黒を終点にせず、色を判別できる暗色から最明色までを9等分する。
+    const lightness = brightestLightness + (darkestLightness - brightestLightness) * brightnessProgress;
+    const l = webToOklch(oklchToWeb({ l: lightness, c: 0, h: 0 })).l;
+    if (ring === 0) {
+      outerChromaLimits = hues.map((hue) => getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]));
+    }
+    const chromaRatio = 1 - (1 - CHROMA_MIN_RATIO) * progress;
+    const availableChromas = ring === 0 ? outerChromaLimits : hues.map((hue, index) =>
+      getSharedChroma(l, outerChromaLimits[index] * chromaRatio, [hue]),
+    );
+    const c = Math.min(...availableChromas);
+    const recoveryProgress = Math.max(0, Math.min(1,
+      (l - DARK_CHROMA_LIGHTNESS) / (FULL_CHROMA_LIGHTNESS - DARK_CHROMA_LIGHTNESS),
+    ));
+    const recoveryWeight = recoveryProgress ** 2 * (3 - 2 * recoveryProgress);
+    const chromas = availableChromas.map((available, index) => {
+      const gain = (available - c) * CHROMA_RECOVERY;
+      // 暗部の上限は共通Cの1.5倍。色相に依存しない制限を明部へ滑らかに解除する。
+      const darkGain = Math.min(gain, c * DARK_CHROMA_GAIN_RATIO);
+      const recovered = Math.min(
+        c + darkGain * (1 - recoveryWeight) + gain * recoveryWeight,
+        previousChromas?.[index] ?? Infinity,
+      );
+      // 青付近ではCの補間点が色域外に出る場合があるため、復元後にも確認する。
+      return getSharedChroma(l, recovered, [hues[index]]);
+    });
+    previousChromas = chromas;
+    rings.push({ l, c, chromas });
+  }
+
+  return { hues, rings: enhancePrimaryTones(hues, rings, state.brightness) };
 }
 
 export function createColorStatuses(state) {
-  const fixedColors = FIXED_COLORS[state.colorSpace];
+  const { hues, rings } = createCircleTones(state);
   const total = state.hueStep * state.chromaStep;
   const result = [];
 
   for (let index = 0; index < total; index += 1) {
     const hueIndex = index % state.hueStep;
     const chromaIndex = Math.floor(index / state.hueStep);
-    const web = getWebColor(index, state, fixedColors, state.hueStep);
+    const tone = rings[chromaIndex];
+    const web = oklchToWeb({ l: tone.lightnesses[hueIndex], c: tone.chromas[hueIndex], h: hues[hueIndex] });
     result.push({
       id: index,
       web,
@@ -336,8 +400,14 @@ function createBrightnessChips(state, selectedChipId, baseAnalysis) {
       ...state,
       brightness,
     };
-    const brightnessStatuses = createColorStatuses(brightnessState);
-    const targetStatus = brightnessStatuses[selectedChipId];
+    // 段数による判定では、10候補分の全色生成は不要。
+    const targetStatus = baseAnalysis.kind === 'step'
+      ? { stepNum: {
+        hue: selectedChipId % state.hueStep + 1,
+        chroma: Math.floor(selectedChipId / state.hueStep) + 1,
+        brightness,
+      } }
+      : createColorStatuses(brightnessState)[selectedChipId];
 
     return {
       brightness,

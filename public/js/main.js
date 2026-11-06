@@ -85,6 +85,7 @@ function applyControllerValue(setting, value) {
 
   appState = nextState;
   renderCircleAndControllerSections();
+  renderUserColorSection();
 }
 
 function handleControllerInput(event) {
