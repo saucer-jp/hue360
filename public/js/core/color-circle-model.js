@@ -10,6 +10,7 @@ const LAYOUT = {
 };
 
 const staticCircleCache = new Map();
+const MAX_CACHED_PALETTES = 32;
 const CHROMA_MIN_RATIO = 0.12;
 // 明部は共通Cと色相別上限の差を90%戻し、暗部は色相間の彩度差を抑える。
 const CHROMA_RECOVERY = 0.9;
@@ -21,11 +22,12 @@ const DARKEST_INNER_LIGHTNESS = 0.3;
 const LIGHTNESS_HEADROOM = 8 / 255;
 const OKLCH_MAX_CHROMA = 0.4;
 const LIGHTNESS_SCALE = 10;
-// 純色付近だけ明るさの一致を緩める。黄色は明るく、赤・青は少し暗くして色域を活かす。
+const VIVID_LIGHTNESS_SHIFT = 0.08;
+// 全色相の色域を活かし、赤・青・黄付近にはさらに広い明度幅を許容する。
 const PRIMARY_TONE_BOOSTS = [
-  { hue: webToOklch('#ff0000').h, radius: 24, lightnessShift: -0.04 },
-  { hue: webToOklch('#ffff00').h, radius: 30, lightnessShift: 0.14 },
-  { hue: webToOklch('#0000ff').h, radius: 40, lightnessShift: -0.045 },
+  { hue: webToOklch('#ff0000').h, radius: 24, lightnessShift: -0.11 },
+  { hue: webToOklch('#ffff00').h, radius: 30, lightnessShift: 0.24 },
+  { hue: webToOklch('#0000ff').h, radius: 40, lightnessShift: -0.18 },
 ];
 const colorProfiles = Object.fromEntries(['munsell', 'rgb', 'rgb+'].map((colorSpace) => {
   const anchors = FIXED_COLORS[colorSpace].map(webToOklch);
@@ -120,22 +122,21 @@ function smoothWeight(value) {
   return progress ** 2 * (3 - 2 * progress);
 }
 
-function getPrimaryToneBoost(hue, lightness, chroma, brightnessWeight) {
+function getVividLightnessShift(hue, lightness) {
   const primary = PRIMARY_TONE_BOOSTS.find(({ hue: center, radius }) => getCircularHueDiff(hue, center) < radius);
-  if (!primary || brightnessWeight === 0) return { l: 0, c: 0 };
-
-  const weight = smoothWeight(1 - getCircularHueDiff(hue, primary.hue) / primary.radius) * brightnessWeight;
-  const targetLightness = lightness + primary.lightnessShift * weight;
-  const originalLimit = getSharedChroma(lightness, OKLCH_MAX_CHROMA, [hue]);
-  let best = { l: lightness, c: originalLimit };
+  const weight = primary ? smoothWeight(1 - getCircularHueDiff(hue, primary.hue) / primary.radius) : 0;
+  let lower = lightness - VIVID_LIGHTNESS_SHIFT;
+  let upper = lightness + VIVID_LIGHTNESS_SHIFT;
+  if (primary?.lightnessShift < 0) lower += (primary.lightnessShift + VIVID_LIGHTNESS_SHIFT) * weight;
+  if (primary?.lightnessShift > 0) upper += (primary.lightnessShift - VIVID_LIGHTNESS_SHIFT) * weight;
+  let best = { l: lightness, c: getSharedChroma(lightness, OKLCH_MAX_CHROMA, [hue]) };
   const consider = (l) => {
     const c = getSharedChroma(l, OKLCH_MAX_CHROMA, [hue]);
     if (c > best.c) best = { l, c };
     return c;
   };
-  consider(targetLightness);
-  let lower = Math.min(lightness, targetLightness);
-  let upper = Math.max(lightness, targetLightness);
+  consider(lower);
+  consider(upper);
   // 色域の頂点を越えて彩度が下がらないよう、許容する明度幅の中だけを探索する。
   for (let iteration = 0; iteration < 12; iteration += 1) {
     const left = lower + (upper - lower) / 3;
@@ -143,18 +144,18 @@ function getPrimaryToneBoost(hue, lightness, chroma, brightnessWeight) {
     if (consider(left) < consider(right)) lower = left;
     else upper = right;
   }
-  return {
-    l: best.l - lightness,
-    c: best.c - originalLimit + Math.max(0, originalLimit - chroma) * weight,
-  };
+  return best.l - lightness;
 }
 
-function enhancePrimaryTones(hues, rings, brightness) {
-  // 明度0で最大、4以降は補正なし。低明度の彩度上限と黒に潰れない終点を維持する。
-  const brightnessWeight = 1 - smoothWeight(brightness / 4);
-  const boosts = hues.map((hue, index) =>
-    getPrimaryToneBoost(hue, rings[0].l, rings[0].chromas[index], brightnessWeight),
-  );
+function enhanceVividTones(hues, rings, brightness, brightestLightness) {
+  // 最明段で決めた補正を明度6までに線形に解消し、青も明度操作で必ず暗くする。
+  const brightnessWeight = Math.max(0, 1 - brightness / 6);
+  const boosts = hues.map((hue, index) => {
+    if (brightnessWeight === 0) return { l: 0, c: 0 };
+    const l = getVividLightnessShift(hue, brightestLightness) * brightnessWeight;
+    const limit = getSharedChroma(rings[0].l + l, OKLCH_MAX_CHROMA, [hue]);
+    return { l, c: (limit - rings[0].chromas[index]) * brightnessWeight };
+  });
   let previousChromas;
   return rings.map((tone, ring) => {
     const radialWeight = (1 - ring / (rings.length - 1)) ** 2;
@@ -166,6 +167,27 @@ function enhancePrimaryTones(hues, rings, brightness) {
     ));
     previousChromas = chromas;
     return { ...tone, lightnesses, chromas };
+  });
+}
+
+function applySaturation(hues, rings, saturation) {
+  // 上限側の減衰を緩やかにする。90%→0.99、75%→0.9375、50%→0.75。
+  const amount = 1 - (1 - saturation / 100) ** 2;
+  if (amount === 1) return rings;
+
+  // 彩度を下げるほど、色相別の彩度差と明度補正を共通トーンへ近づける。
+  const variationWeight = amount ** 2;
+  let previousChromas;
+  return rings.map((tone) => {
+    const commonChroma = getSharedChroma(tone.l, Math.min(tone.c, ...tone.chromas), hues);
+    const lightnesses = tone.lightnesses.map((lightness) => tone.l + (lightness - tone.l) * variationWeight);
+    const chromas = tone.chromas.map((chroma, index) => getSharedChroma(
+      lightnesses[index],
+      Math.min(amount * (commonChroma + (chroma - commonChroma) * variationWeight), previousChromas?.[index] ?? Infinity),
+      [hues[index]],
+    ));
+    previousChromas = chromas;
+    return { ...tone, c: commonChroma * amount, lightnesses, chromas };
   });
 }
 
@@ -227,7 +249,9 @@ export function createCircleTones(state) {
     rings.push({ l, c, chromas });
   }
 
-  return { hues, rings: enhancePrimaryTones(hues, rings, state.brightness) };
+  const brightestLightness = webToOklch(oklchToWeb({ l: profile.lightness, c: 0, h: 0 })).l;
+  const vividRings = enhanceVividTones(hues, rings, state.brightness, brightestLightness);
+  return { hues, rings: applySaturation(hues, vividRings, state.saturation) };
 }
 
 export function createColorStatuses(state) {
@@ -419,7 +443,7 @@ function createBrightnessChips(state, selectedChipId, baseAnalysis) {
 }
 
 function createStaticKey(state) {
-  return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness].join(':');
+  return [state.colorSpace, state.hueStep, state.chromaStep, state.brightness, state.saturation].join(':');
 }
 
 function getStaticCircleData(state) {
@@ -433,6 +457,10 @@ function getStaticCircleData(state) {
     chipStatuses: createChipStatuses(state),
   };
 
+  // 連続したスライダー操作で全設定のパレットを保持し続けない。
+  if (staticCircleCache.size >= MAX_CACHED_PALETTES) {
+    staticCircleCache.delete(staticCircleCache.keys().next().value);
+  }
   staticCircleCache.set(cacheKey, staticData);
   return staticData;
 }

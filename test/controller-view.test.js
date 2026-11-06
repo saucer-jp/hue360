@@ -32,8 +32,14 @@ function createBrightnessNode(brightness) {
 
 test('renderController applies current and clash classes to brightness chips', () => {
   const brightnessNodes = Array.from({ length: 4 }, (_, brightness) => createBrightnessNode(brightness));
-  const inputs = [{ dataset: { setting: 'judgeEnabled' }, value: 'false' }];
-  const settingValues = [{ dataset: { settingValue: 'brightness' }, textContent: '' }];
+  const inputs = [
+    { dataset: { setting: 'judgeEnabled' }, value: 'false' },
+    { dataset: { setting: 'saturation' }, value: '100' },
+  ];
+  const settingValues = [
+    { dataset: { settingValue: 'brightness' }, textContent: '' },
+    { dataset: { settingValue: 'saturation' }, textContent: '' },
+  ];
   const ownerDocument = {
     querySelectorAll(selector) {
       if (selector === '#brightness .chip') {
@@ -57,7 +63,7 @@ test('renderController applies current and clash classes to brightness chips', (
       return [];
     },
   };
-  const state = createInitialState({ brightness: 2, judgeEnabled: true });
+  const state = createInitialState({ brightness: 2, judgeEnabled: true, saturation: 0 });
   const brightnessChips = [
     { brightness: 0, isCurrent: false, isClashing: false },
     { brightness: 1, isCurrent: false, isClashing: true },
@@ -69,6 +75,8 @@ test('renderController applies current and clash classes to brightness chips', (
 
   assert.equal(inputs[0].value, 'true');
   assert.equal(settingValues[0].textContent, '2');
+  assert.equal(inputs[1].value, '0');
+  assert.equal(settingValues[1].textContent, '0');
   assert.equal(brightnessNodes[0].classList.contains('current-brightness'), false);
   assert.equal(brightnessNodes[1].classList.contains('brightness-clash'), true);
   assert.equal(brightnessNodes[2].classList.contains('current-brightness'), true);

@@ -51,7 +51,7 @@ export function createCircleRenderer(root) {
   let lastStructureKey = null;
 
   return function renderCircle(circleModel) {
-    const structureKey = circleModel.staticKey;
+    const structureKey = circleModel.chips.length;
 
     if (!circle || structureKey !== lastStructureKey) {
       circle?.remove();

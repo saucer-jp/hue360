@@ -81,8 +81,8 @@ test('vivid rings stay in gamut with bounded tone variation and descending spoke
             const row = colors.slice(ringIndex * hueStep, (ringIndex + 1) * hueStep);
             const tolerance = 0.005;
             const lightnesses = row.map((color) => color.oklch.l);
-            const uniform = brightness >= 4 || ringIndex === chromaStep - 1;
-            assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) <= (uniform ? tolerance : 0.19), `${label}: lightness spread`);
+            const uniform = brightness >= 6 || ringIndex === chromaStep - 1;
+            assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) <= (uniform ? tolerance : 0.425), `${label}: lightness spread`);
             assert.ok(lightnesses.every((value, index) => Math.abs(value - tone.lightnesses[index]) <= tolerance), `${label}: lightness target`);
             row.forEach((color, hueIndex) => {
               const target = { l: tone.lightnesses[hueIndex], c: tone.chromas[hueIndex], h: hues[hueIndex] };
@@ -116,26 +116,26 @@ test('bright outer colors retain most of each hue gamut', () => {
       const { hues, rings } = createCircleTones(state);
       const outer = rings[0];
       const limits = hues.map((hue, index) => getSharedChroma(outer.lightnesses[index], 0.4, [hue]));
-      const commonChroma = Math.min(...limits);
+      const commonChroma = outer.c;
       outer.chromas.forEach((chroma, index) => {
         assert.ok(chroma >= commonChroma);
         assert.ok(chroma >= limits[index] * 0.9, 'retain at least 90% of the available outer chroma');
-        assert.ok(chroma <= limits[index]);
+        assert.ok(chroma <= limits[index] + 1e-7, 'stay within the gamut search precision');
       });
       const colors = createColorStatuses(state).slice(0, state.hueStep);
       const meanChroma = colors.reduce((sum, color) => sum + color.oklch.c, 0) / colors.length;
       assert.ok(meanChroma > commonChroma * 1.25, `${colorSpace}/${brightness}: recover visible saturation`);
       const lightnesses = colors.map((color) => color.oklch.l);
-      assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) < 0.19);
+      assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) < 0.425);
     }
   }
 });
 
 test('pure reds blues and especially yellows gain chroma within limited lightness shifts', () => {
   const primaries = [
-    { hex: '#ff0000', minShift: -0.041, maxShift: -0.03 },
-    { hex: '#ffff00', minShift: 0.12, maxShift: 0.141 },
-    { hex: '#0000ff', minShift: -0.046, maxShift: -0.035 },
+    { hex: '#ff0000', minShift: -0.111, maxShift: -0.075 },
+    { hex: '#ffff00', minShift: 0.22, maxShift: 0.241 },
+    { hex: '#0000ff', minShift: -0.181, maxShift: -0.17 },
   ];
   for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
     const state = createInitialState({ colorSpace, hueStep: 100, chromaStep: 7 });
@@ -152,14 +152,14 @@ test('pure reds blues and especially yellows gain chroma within limited lightnes
       assert.ok(shift >= minShift && shift <= maxShift, `${colorSpace}/${hex}: bounded lightness shift`);
       assert.ok(hueDifference(colors[index].oklch.h, hues[index]) < 1, 'keep the original hue');
       if (hex === '#ffff00') {
-        assert.ok(colors[index].rgb.r > 200 && colors[index].rgb.g > 200 && colors[index].rgb.b < 10, 'yellow is vivid rather than olive');
+        assert.ok(colors[index].rgb.r > 240 && colors[index].rgb.g > 240 && colors[index].rgb.b < 10, 'yellow reaches a vivid near-primary color');
       }
     });
     hues.forEach((hue, index) => {
       if (hue < 150 || hue > 210) return;
-      assert.equal(outer.lightnesses[index], outer.l, 'greens and cyans retain the common lightness');
+      assert.ok(Math.abs(outer.lightnesses[index] - outer.l) <= 0.081, 'other hues use a smaller lightness allowance');
       const limit = getSharedChroma(outer.l, 0.4, [hue]);
-      assert.ok(Math.abs(outer.chromas[index] - (outer.c + (limit - outer.c) * 0.9)) < 1e-6);
+      assert.ok(outer.chromas[index] > (outer.c + (limit - outer.c) * 0.9) * 1.08, 'greens and cyans also gain vividness');
     });
   }
 });
@@ -174,10 +174,105 @@ test('primary tone variation fades inward and disappears on the dark side', () =
       previousOuterVariation = variations[0];
       variations.forEach((variation, index) => {
         if (index > 0) assert.ok(variation <= variations[index - 1] + 1e-9, 'inner rings stay more uniform');
-        if (brightness >= 4 || index === rings.length - 1) assert.equal(variation, 0);
+        if (brightness >= 6 || index === rings.length - 1) assert.equal(variation, 0);
       });
     }
   }
+});
+
+test('zero saturation produces one neutral gray per ring without changing brightness endpoints', () => {
+  for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
+    for (const brightness of [0, 4, 9]) {
+      const state = createInitialState({ colorSpace, brightness, saturation: 0, chromaStep: 7 });
+      const { rings } = createCircleTones(state);
+      const colors = createColorStatuses(state);
+      rings.forEach((tone, ring) => {
+        const row = colors.slice(ring * state.hueStep, (ring + 1) * state.hueStep);
+        assert.equal(new Set(row.map((color) => color.web)).size, 1);
+        assert.ok(tone.chromas.every((chroma) => chroma === 0));
+        row.forEach(({ rgb, oklch, web }) => {
+          assert.equal(rgb.r, rgb.g);
+          assert.equal(rgb.g, rgb.b);
+          assert.ok(Math.abs(oklch.l - tone.l) < 0.003);
+          assert.notEqual(web, '#000000');
+          assert.notEqual(web, '#ffffff');
+        });
+      });
+    }
+  }
+});
+
+test('lower saturation improves lightness and relative chroma uniformity while remaining in gamut', () => {
+  for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
+    for (const brightness of [0, 3, 7, 9]) {
+      const state = createInitialState({ colorSpace, brightness, hueStep: 42, chromaStep: 7 });
+      let previous;
+      for (const saturation of [100, 75, 50, 25, 1, 0]) {
+        const { hues, rings } = createCircleTones({ ...state, saturation });
+        rings.forEach((tone, ring) => {
+          const spread = Math.max(...tone.lightnesses) - Math.min(...tone.lightnesses);
+          const chromaSpread = Math.max(...tone.chromas) - Math.min(...tone.chromas);
+          const minimumChroma = Math.min(...tone.chromas);
+          const relativeSpread = minimumChroma === 0 ? 0 : chromaSpread / minimumChroma;
+          if (previous) {
+            const prior = previous[ring];
+            assert.ok(spread <= prior.spread + 1e-9);
+            assert.ok(relativeSpread <= prior.relativeSpread + 1e-6, 'improve uniformity beyond merely scaling every chroma');
+          }
+          tone.chromas.forEach((chroma, index) => {
+            const target = { l: tone.lightnesses[index], c: chroma, h: hues[index] };
+            assert.ok(isSrgbInGamut(oklchToSrgb(target)));
+            if (previous) assert.ok(chroma <= previous[ring].chromas[index] + 1e-9, 'lower slider never increases chroma');
+            if (ring > 0) assert.ok(chroma <= rings[ring - 1].chromas[index], 'chroma does not rise inward');
+          });
+        });
+        previous = rings.map((tone) => ({
+          chromas: tone.chromas,
+          spread: Math.max(...tone.lightnesses) - Math.min(...tone.lightnesses),
+          relativeSpread: Math.min(...tone.chromas) === 0 ? 0 : (Math.max(...tone.chromas) - Math.min(...tone.chromas)) / Math.min(...tone.chromas),
+        }));
+      }
+      const high = createCircleTones(state).rings;
+      const half = createCircleTones({ ...state, saturation: 50 }).rings;
+      half.forEach((tone, ring) => {
+        const highSpread = Math.max(...high[ring].chromas) - Math.min(...high[ring].chromas);
+        const halfSpread = Math.max(...tone.chromas) - Math.min(...tone.chromas);
+        assert.ok(halfSpread <= highSpread * 0.43 + 1e-6, 'half saturation still reduces chroma differences');
+        const highLightnessSpread = Math.max(...high[ring].lightnesses) - Math.min(...high[ring].lightnesses);
+        const halfLightnessSpread = Math.max(...tone.lightnesses) - Math.min(...tone.lightnesses);
+        assert.ok(halfLightnessSpread <= highLightnessSpread * 0.57 + 1e-9);
+      });
+    }
+  }
+});
+
+test('upper saturation steps retain vividness and fade gently from the maximum', () => {
+  for (const colorSpace of ['munsell', 'rgb', 'rgb+']) {
+    for (const brightness of [0, 3, 7]) {
+      const state = createInitialState({ colorSpace, brightness, hueStep: 100 });
+      const averageChroma = (saturation) => {
+        const outer = createCircleTones({ ...state, saturation }).rings[0];
+        return outer.chromas.reduce((sum, chroma) => sum + chroma, 0) / state.hueStep;
+      };
+      const full = averageChroma(100);
+      assert.ok(averageChroma(99) >= full * 0.999, 'no jump when leaving 100%');
+      assert.ok(averageChroma(95) >= full * 0.99);
+      assert.ok(averageChroma(90) >= full * 0.97, '90% retains nearly all outer chroma');
+      assert.ok(averageChroma(75) >= full * 0.85, '75% stays vivid');
+      assert.ok(averageChroma(50) >= full * 0.58, 'midpoint retains more than half the chroma');
+      assert.ok(averageChroma(25) < full * 0.45, 'lower settings still reach muted tones');
+    }
+  }
+});
+
+test('saturation is part of the palette cache and restoring it restores the same colors', () => {
+  const state = createInitialState({ saturation: 100 });
+  const full = createCircleModel(state);
+  const low = createCircleModel({ ...state, saturation: 25 });
+  assert.notEqual(full.staticKey, low.staticKey);
+  assert.notDeepEqual(full.colorStatuses, low.colorStatuses);
+  assert.equal(full.chips.length, low.chips.length);
+  assert.deepEqual(createCircleModel(state).colorStatuses, full.colorStatuses);
 });
 
 test('dark rings cap chroma outliers while retaining hue and visible tint', () => {

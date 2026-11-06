@@ -53,12 +53,14 @@ test('clearSelection preserves unrelated state while clearing chosen colors', ()
     baseChromaIndex: 0,
     baseColorBrightness: 4,
     selectedColors: ['#111111'],
+    saturation: 25,
   });
   state = setBackgroundColor(state, '#123456');
   state = setPrintVisible(state, true);
   state = clearSelection(state);
 
   assert.equal(state.backgroundColor, '#123456');
+  assert.equal(state.saturation, 25);
   assert.equal(state.baseColor, null);
   assert.equal(state.baseHueAngle, null);
   assert.equal(state.baseChromaIndex, null);

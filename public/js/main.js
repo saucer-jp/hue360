@@ -42,7 +42,8 @@ function syncBaseColor(state) {
     return state;
   }
 
-  const circleModel = createCircleModel(state);
+  // 基準色は選択時の明度を保ち、現在のプレビュー明度へ意図せず置き換えない。
+  const circleModel = createCircleModel({ ...state, brightness: state.baseColorBrightness ?? state.brightness });
   const selectedChipId = circleModel.selectedChipId;
   const selectedStatus = selectedChipId == null ? null : circleModel.colorStatuses[selectedChipId];
   return syncBaseColorSelection(state, selectedStatus);
@@ -78,6 +79,7 @@ function renderApp() {
 function applyControllerValue(setting, value) {
   const normalizedValue =
     setting === 'judgeEnabled' ? value === 'true' : Number.isNaN(Number(value)) ? value : Number(value);
+  if (normalizedValue === appState[setting]) return;
   let nextState = updateSetting(appState, setting, normalizedValue);
   if (setting !== 'judgeEnabled') {
     nextState = syncBaseColor(nextState);
