@@ -4,6 +4,8 @@ const toOklchColor = converter('oklch');
 const toRgbColor = converter('rgb');
 const clampToRgb = toGamut('rgb', 'oklch', null);
 const RGB_EPSILON = 0.000001;
+const SRGB_OUTPUT_MARGIN = 0.0001;
+const GAMUT_SEARCH_ITERATIONS = 22;
 
 function normalizeHue(hue) {
   return ((hue ?? 0) % 360 + 360) % 360;
@@ -43,6 +45,44 @@ export function webToOklch(web) {
     c: color.c ?? 0,
     h: normalizeHue(color.h),
   };
+}
+
+// 色域調整や丸めを行わない、0〜1基準のsRGB値。
+export function oklchToSrgb({ l, c, h }) {
+  return toRgbColor({ mode: 'oklch', l, c, h: normalizeHue(h) });
+}
+
+export function isSrgbInGamut(rgb, margin = 0) {
+  return rgb != null && [rgb.r, rgb.g, rgb.b].every(
+    (channel) => Number.isFinite(channel) && channel >= margin && channel <= 1 - margin,
+  );
+}
+
+export function getSharedChroma(lightness, requestedChroma, hues) {
+  const upperChroma = Math.max(0, Math.min(0.4, requestedChroma));
+  const fitsEveryHue = (chroma) => hues.every((hue) =>
+    isSrgbInGamut(oklchToSrgb({ l: lightness, c: chroma, h: hue }), SRGB_OUTPUT_MARGIN),
+  );
+
+  // 白黒の端点には彩度を持たせず、境界に近い有彩色には微小な余裕を残す。
+  if (hues.length === 0 || upperChroma === 0 || !fitsEveryHue(0)) {
+    return 0;
+  }
+  if (fitsEveryHue(upperChroma)) {
+    return upperChroma;
+  }
+
+  let lower = 0;
+  let upper = upperChroma;
+  for (let iteration = 0; iteration < GAMUT_SEARCH_ITERATIONS; iteration += 1) {
+    const middle = (lower + upper) / 2;
+    if (fitsEveryHue(middle)) {
+      lower = middle;
+    } else {
+      upper = middle;
+    }
+  }
+  return lower;
 }
 
 export function oklchToWeb(oklch) {

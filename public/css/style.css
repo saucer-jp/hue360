@@ -109,6 +109,12 @@ body {
   width: 100%;
 }
 
+@media (max-height: 850px) {
+  #controller .saturation-conf {
+    clear: left;
+  }
+}
+
 #title {
   position: absolute;
   top: 34px;
